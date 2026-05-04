@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Token Ledger UI</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f4f2ed;
+      --sheet: #fcfbf7;
+      --ink: #191b1f;
+      --muted: #687078;
+      --rail: #24272d;
+      --line: #d9d2c7;
+      --line-dark: #383c44;
+      --codex: #0f9f6e;
+      --claude: #a45f2a;
+      --blue: #245fd5;
+      --amber: #c38218;
+      --red: #c64d3b;
+      --shadow: 0 24px 70px rgba(25, 27, 31, 0.14);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(90deg, rgba(25,27,31,.045) 1px, transparent 1px) 0 0 / 28px 28px,
+        linear-gradient(0deg, rgba(25,27,31,.04) 1px, transparent 1px) 0 0 / 28px 28px,
+        var(--paper);
+      color: var(--ink);
+      font-family: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 76px minmax(0, 1fr) 344px;
+    }
+
+    .rail {
+      background: var(--rail);
+      color: #f5f1e9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 18px 12px;
+      gap: 18px;
+      border-right: 1px solid #111317;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border: 1px solid #535963;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      position: relative;
+      background: #16191e;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      width: 20px;
+      height: 4px;
+      border-radius: 999px;
+      display: block;
+      position: absolute;
+      left: 8px;
+    }
+
+    .brand-mark::before { top: 12px; background: var(--codex); }
+    .brand-mark::after { bottom: 12px; background: var(--claude); width: 14px; }
+
+    .rail-button {
+      width: 38px;
+      height: 38px;
+      border: 1px solid #444a54;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #cfd6dc;
+      background: transparent;
+    }
+
+    .rail-button.active {
+      border-color: #d8d2c8;
+      background: #f5f1e9;
+      color: #181b20;
+    }
+
+    .rail-icon {
+      width: 16px;
+      height: 16px;
+      position: relative;
+      display: inline-block;
+    }
+
+    .rail-icon.bars::before,
+    .rail-icon.bars::after {
+      content: "";
+      position: absolute;
+      left: 1px;
+      width: 14px;
+      height: 4px;
+      background: currentColor;
+      border-radius: 999px;
+    }
+
+    .rail-icon.bars::before { top: 2px; }
+    .rail-icon.bars::after { bottom: 2px; width: 10px; }
+
+    .rail-icon.scan {
+      border: 2px solid currentColor;
+      border-radius: 4px;
+    }
+
+    .rail-icon.scan::after {
+      content: "";
+      position: absolute;
+      left: 2px;
+      right: 2px;
+      top: 6px;
+      height: 2px;
+      background: currentColor;
+    }
+
+    .rail-icon.gear {
+      border: 2px solid currentColor;
+      border-radius: 50%;
+    }
+
+    .rail-icon.gear::after {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .workspace {
+      min-width: 0;
+      padding: 28px 30px 32px;
+    }
+
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .eyebrow {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Bahnschrift", "Aptos Display", "Microsoft YaHei", sans-serif;
+      font-size: 34px;
+      line-height: 1.05;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .offline-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--sheet);
+      color: #34383f;
+      font-size: 12px;
+      box-shadow: 0 8px 20px rgba(25,27,31,.06);
+      white-space: nowrap;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--codex);
+      box-shadow: 0 0 0 6px rgba(15,159,110,.12);
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .segments {
+      display: inline-grid;
+      grid-template-columns: repeat(3, 1fr);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--sheet);
+      overflow: hidden;
+    }
+
+    .segment {
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: transparent;
+      color: #34383f;
+      height: 38px;
+      padding: 0 14px;
+      min-width: 92px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .segment:last-child { border-right: 0; }
+
+    .segment.active {
+      color: #f9f4ea;
+      background: var(--rail);
+    }
+
+    .scan-button {
+      border: 1px solid #1f242b;
+      background: #1f242b;
+      color: #fff8ee;
+      border-radius: 8px;
+      height: 38px;
+      padding: 0 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .scan-dot {
+      width: 12px;
+      height: 12px;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .scan-dot::after {
+      content: "";
+      width: 6px;
+      height: 2px;
+      background: currentColor;
+      position: absolute;
+      right: -5px;
+      bottom: -2px;
+      transform: rotate(45deg);
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr);
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--sheet);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .hero-panel {
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-panel::after {
+      content: "";
+      position: absolute;
+      right: 16px;
+      top: 18px;
+      width: 112px;
+      height: 112px;
+      border: 1px solid rgba(25,27,31,.12);
+      background:
+        linear-gradient(90deg, rgba(25,27,31,.08) 1px, transparent 1px) 0 0 / 14px 14px,
+        linear-gradient(0deg, rgba(25,27,31,.08) 1px, transparent 1px) 0 0 / 14px 14px;
+      opacity: .55;
+    }
+
+    .metric-header {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+    .metric-title {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .total-number {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 58px;
+      line-height: .95;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .unit {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .delta {
+      position: relative;
+      z-index: 1;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #f6efe5;
+      color: #7c491d;
+      min-width: 132px;
+      font-size: 12px;
+    }
+
+    .stack-meter {
+      height: 18px;
+      display: flex;
+      border: 1px solid #c9c0b2;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #e7dfd3;
+      margin-bottom: 22px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .stack-meter span { display: block; height: 100%; }
+    .stack-meter .codex { background: var(--codex); width: 54%; }
+    .stack-meter .claude { background: var(--claude); width: 46%; }
+
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .provider-tile {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fffdf8;
+      min-height: 150px;
+    }
+
+    .tile-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+
+    .provider-name {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+    }
+
+    .provider-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--codex);
+    }
+
+    .provider-dot.claude { background: var(--claude); }
+
+    .file-count {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .provider-number {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 31px;
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: 0;
+      margin-bottom: 12px;
+    }
+
+    .breakdown {
+      display: grid;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .breakdown-row {
+      display: grid;
+      grid-template-columns: 78px minmax(0, 1fr) 54px;
+      align-items: center;
+      gap: 8px;
+      color: #41474f;
+    }
+
+    .mini-bar {
+      height: 6px;
+      border-radius: 999px;
+      background: #e0d8ca;
+      overflow: hidden;
+    }
+
+    .mini-bar span {
+      display: block;
+      height: 100%;
+      background: var(--blue);
+    }
+
+    .mini-bar.cache span { background: var(--amber); }
+    .mini-bar.output span { background: var(--red); }
+
+    .chart-panel {
+      padding: 18px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-family: "Bahnschrift", "Aptos Display", "Microsoft YaHei", sans-serif;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .tiny-note {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .daily-chart {
+      height: 158px;
+      display: grid;
+      grid-template-columns: repeat(15, minmax(8px, 1fr));
+      align-items: end;
+      gap: 7px;
+      padding: 10px 4px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .day {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+      align-items: end;
+      height: 100%;
+    }
+
+    .day span {
+      display: block;
+      border-radius: 4px 4px 0 0;
+    }
+
+    .day .codex { background: var(--codex); }
+    .day .claude { background: var(--claude); }
+
+    .models {
+      display: grid;
+      gap: 10px;
+    }
+
+    .model-row {
+      display: grid;
+      grid-template-columns: 1fr 92px;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+    }
+
+    .model-name {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .model-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #e0d8ca;
+      overflow: hidden;
+    }
+
+    .model-track span {
+      display: block;
+      height: 100%;
+      background: #252930;
+    }
+
+    .model-row strong {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      text-align: right;
+    }
+
+    .side {
+      background: #1f2228;
+      color: #f7f1e7;
+      border-left: 1px solid #111317;
+      padding: 28px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .side-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .side-title h2 {
+      margin: 0;
+      font-family: "Bahnschrift", "Aptos Display", "Microsoft YaHei", sans-serif;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .tray-preview {
+      background: #f7f1e7;
+      color: #1f2228;
+      border-radius: 8px;
+      border: 1px solid #6a6258;
+      box-shadow: 0 24px 60px rgba(0,0,0,.34);
+      overflow: hidden;
+    }
+
+    .tray-header {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      border-bottom: 1px solid #d6cbbc;
+      background: #fffaf1;
+      font-weight: 700;
+    }
+
+    .tray-body {
+      padding: 14px;
+    }
+
+    .tray-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .tray-total strong {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .tray-total span {
+      color: #6c6258;
+      font-size: 12px;
+    }
+
+    .tray-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .tray-item {
+      border: 1px solid #dfd4c5;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fffdf8;
+    }
+
+    .tray-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .tray-meter {
+      height: 7px;
+      border-radius: 999px;
+      background: #e6dccf;
+      overflow: hidden;
+    }
+
+    .tray-meter span {
+      display: block;
+      height: 100%;
+      background: var(--codex);
+    }
+
+    .tray-meter.claude span { background: var(--claude); }
+
+    .source-box {
+      border: 1px solid #41464f;
+      border-radius: 8px;
+      padding: 14px;
+      background: #262a31;
+      color: #cfd6dc;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .source-box h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: #f7f1e7;
+    }
+
+    .source-path {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      color: #f0d9a8;
+      word-break: break-all;
+      display: block;
+      margin-top: 6px;
+    }
+
+    .privacy-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .privacy-item {
+      border: 1px solid #41464f;
+      border-radius: 8px;
+      padding: 10px;
+      color: #e9e2d8;
+      font-size: 12px;
+      background: #262a31;
+      min-height: 66px;
+    }
+
+    .privacy-item strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #ffffff;
+    }
+
+    .fineprint {
+      color: #aeb6be;
+      font-size: 11px;
+      line-height: 1.6;
+      margin-top: auto;
+    }
+
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .topline,
+    .controls,
+    .panel,
+    .side > * {
+      animation: enter .45s ease both;
+    }
+
+    .controls { animation-delay: .04s; }
+    .hero-panel { animation-delay: .08s; }
+    .chart-panel { animation-delay: .12s; }
+    .side > *:nth-child(2) { animation-delay: .08s; }
+    .side > *:nth-child(3) { animation-delay: .12s; }
+    .side > *:nth-child(4) { animation-delay: .16s; }
+
+    @media (max-width: 1120px) {
+      .app {
+        grid-template-columns: 64px minmax(0, 1fr);
+      }
+
+      .side {
+        grid-column: 1 / -1;
+        border-left: 0;
+        border-top: 1px solid #111317;
+        display: grid;
+        grid-template-columns: minmax(280px, 360px) 1fr;
+      }
+
+      .fineprint { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 840px) {
+      .app { grid-template-columns: 1fr; }
+      .rail {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-right: 0;
+      }
+      .rail-button { display: none; }
+      .workspace { padding: 22px 16px; }
+      .topline,
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      h1 { font-size: 28px; }
+      .segments { width: 100%; }
+      .segment { min-width: 0; }
+      .dashboard,
+      .provider-grid,
+      .side,
+      .privacy-strip {
+        grid-template-columns: 1fr;
+      }
+      .metric-header { flex-direction: column; }
+      .total-number { font-size: 44px; }
+      .daily-chart { gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail" aria-label="Navigation">
+      <div class="brand-mark" title="Local Token Ledger"></div>
+      <div class="rail-button active" title="Ledger"><span class="rail-icon bars"></span></div>
+      <div class="rail-button" title="Scan"><span class="rail-icon scan"></span></div>
+      <div class="rail-button" title="Settings"><span class="rail-icon gear"></span></div>
+    </aside>
+
+    <main class="workspace">
+      <div class="topline">
+        <div>
+          <div class="eyebrow">local-only token accounting</div>
+          <h1>Codex / Claude<br>本地 Token 总账</h1>
+        </div>
+        <div class="offline-pill"><span class="pulse"></span>不登录 · 不联网 · 不读 Cookie</div>
+      </div>
+
+      <div class="controls" aria-label="Time range controls">
+        <div class="segments">
+          <button class="segment active" data-range="30d">最近 30 天</button>
+          <button class="segment" data-range="month">本月</button>
+          <button class="segment" data-range="today">今天</button>
+        </div>
+        <button class="scan-button" type="button"><span class="scan-dot"></span>重新扫描</button>
+      </div>
+
+      <section class="dashboard" aria-label="Token dashboard">
+        <div class="panel hero-panel">
+          <div class="metric-header">
+            <div>
+              <div class="metric-title">Total scanned tokens</div>
+              <div class="total-number" id="totalTokens">3.42M</div>
+              <div class="unit" id="rangeLabel">最近 30 天 · Codex + Claude</div>
+            </div>
+            <div class="delta">
+              <strong id="scanStatus">955 JSONL</strong><br>
+              本地文件已纳入统计
+            </div>
+          </div>
+
+          <div class="stack-meter" aria-label="Provider share">
+            <span class="codex" id="codexShare"></span>
+            <span class="claude" id="claudeShare"></span>
+          </div>
+
+          <div class="provider-grid">
+            <article class="provider-tile">
+              <div class="tile-top">
+                <div class="provider-name"><span class="provider-dot"></span>Codex</div>
+                <div class="file-count">854 files</div>
+              </div>
+              <div class="provider-number" id="codexTokens">1.86M</div>
+              <div class="breakdown">
+                <div class="breakdown-row"><span>Input</span><span class="mini-bar"><span style="width: 78%"></span></span><strong id="codexInput">1.08M</strong></div>
+                <div class="breakdown-row"><span>Cache</span><span class="mini-bar cache"><span style="width: 47%"></span></span><strong id="codexCache">512k</strong></div>
+                <div class="breakdown-row"><span>Output</span><span class="mini-bar output"><span style="width: 28%"></span></span><strong id="codexOutput">268k</strong></div>
+              </div>
+            </article>
+
+            <article class="provider-tile">
+              <div class="tile-top">
+                <div class="provider-name"><span class="provider-dot claude"></span>Claude</div>
+                <div class="file-count">101 files</div>
+              </div>
+              <div class="provider-number" id="claudeTokens">1.56M</div>
+              <div class="breakdown">
+                <div class="breakdown-row"><span>Input</span><span class="mini-bar"><span style="width: 68%"></span></span><strong id="claudeInput">821k</strong></div>
+                <div class="breakdown-row"><span>Cache</span><span class="mini-bar cache"><span style="width: 42%"></span></span><strong id="claudeCache">487k</strong></div>
+                <div class="breakdown-row"><span>Output</span><span class="mini-bar output"><span style="width: 32%"></span></span><strong id="claudeOutput">252k</strong></div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="panel chart-panel">
+          <div>
+            <div class="section-title">
+              <h2>Daily pulse</h2>
+              <span class="tiny-note">stacked by provider</span>
+            </div>
+            <div class="daily-chart" aria-label="Daily token chart">
+              <div class="day"><span class="codex" style="height: 54%"></span><span class="claude" style="height: 23%"></span></div>
+              <div class="day"><span class="codex" style="height: 31%"></span><span class="claude" style="height: 35%"></span></div>
+              <div class="day"><span class="codex" style="height: 65%"></span><span class="claude" style="height: 22%"></span></div>
+              <div class="day"><span class="codex" style="height: 38%"></span><span class="claude" style="height: 48%"></span></div>
+              <div class="day"><span class="codex" style="height: 72%"></span><span class="claude" style="height: 32%"></span></div>
+              <div class="day"><span class="codex" style="height: 44%"></span><span class="claude" style="height: 20%"></span></div>
+              <div class="day"><span class="codex" style="height: 58%"></span><span class="claude" style="height: 43%"></span></div>
+              <div class="day"><span class="codex" style="height: 81%"></span><span class="claude" style="height: 28%"></span></div>
+              <div class="day"><span class="codex" style="height: 40%"></span><span class="claude" style="height: 36%"></span></div>
+              <div class="day"><span class="codex" style="height: 62%"></span><span class="claude" style="height: 51%"></span></div>
+              <div class="day"><span class="codex" style="height: 34%"></span><span class="claude" style="height: 25%"></span></div>
+              <div class="day"><span class="codex" style="height: 76%"></span><span class="claude" style="height: 47%"></span></div>
+              <div class="day"><span class="codex" style="height: 45%"></span><span class="claude" style="height: 60%"></span></div>
+              <div class="day"><span class="codex" style="height: 69%"></span><span class="claude" style="height: 31%"></span></div>
+              <div class="day"><span class="codex" style="height: 52%"></span><span class="claude" style="height: 41%"></span></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">
+              <h2>Model ledger</h2>
+              <span class="tiny-note">top buckets</span>
+            </div>
+            <div class="models">
+              <div class="model-row">
+                <div>
+                  <div class="model-name"><span>gpt-5.3-codex</span><span>Codex</span></div>
+                  <div class="model-track"><span style="width: 88%"></span></div>
+                </div>
+                <strong>1.24M</strong>
+              </div>
+              <div class="model-row">
+                <div>
+                  <div class="model-name"><span>claude-sonnet</span><span>Claude</span></div>
+                  <div class="model-track"><span style="width: 72%"></span></div>
+                </div>
+                <strong>986k</strong>
+              </div>
+              <div class="model-row">
+                <div>
+                  <div class="model-name"><span>gpt-5.3-codex-spark</span><span>Codex</span></div>
+                  <div class="model-track"><span style="width: 46%"></span></div>
+                </div>
+                <strong>438k</strong>
+              </div>
+              <div class="model-row">
+                <div>
+                  <div class="model-name"><span>claude-opus</span><span>Claude</span></div>
+                  <div class="model-track"><span style="width: 29%"></span></div>
+                </div>
+                <strong>312k</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="side" aria-label="Tray preview and local sources">
+      <div class="side-title">
+        <h2>Tray panel</h2>
+        <span class="tiny-note">compact mode</span>
+      </div>
+
+      <div class="tray-preview">
+        <div class="tray-header">
+          <span>Token Ledger</span>
+          <span>30d</span>
+        </div>
+        <div class="tray-body">
+          <div class="tray-total">
+            <div>
+              <strong id="trayTotal">3.42M</strong>
+              <span>tokens scanned</span>
+            </div>
+            <span>14s ago</span>
+          </div>
+          <div class="tray-list">
+            <div class="tray-item">
+              <div class="tray-line"><span>Codex</span><strong id="trayCodex">1.86M</strong></div>
+              <div class="tray-meter"><span id="trayCodexBar" style="width:54%"></span></div>
+            </div>
+            <div class="tray-item">
+              <div class="tray-line"><span>Claude</span><strong id="trayClaude">1.56M</strong></div>
+              <div class="tray-meter claude"><span id="trayClaudeBar" style="width:46%"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="source-box">
+        <h3>Local sources</h3>
+        Codex scans:
+        <span class="source-path">%USERPROFILE%\.codex\sessions</span>
+        Claude scans:
+        <span class="source-path">%USERPROFILE%\.claude\projects</span>
+      </div>
+
+      <div class="privacy-strip">
+        <div class="privacy-item"><strong>No auth</strong>不打开 OAuth，不读取 auth.json。</div>
+        <div class="privacy-item"><strong>No cookies</strong>不碰浏览器，不导入会话。</div>
+        <div class="privacy-item"><strong>No network</strong>统计逻辑可完全离线运行。</div>
+      </div>
+
+      <p class="fineprint">
+        这是静态 UI 原型，数字是示意。真实实现只读取 JSONL 里的 usage 字段并输出聚合结果，不展示聊天内容。
+      </p>
+    </aside>
+  </div>
+
+  <script>
+    const ranges = {
+      "30d": {
+        label: "最近 30 天 · Codex + Claude",
+        total: "3.42M",
+        scan: "955 JSONL",
+        codex: "1.86M",
+        claude: "1.56M",
+        codexInput: "1.08M",
+        codexCache: "512k",
+        codexOutput: "268k",
+        claudeInput: "821k",
+        claudeCache: "487k",
+        claudeOutput: "252k",
+        codexShare: 54,
+        claudeShare: 46
+      },
+      month: {
+        label: "本月 · Codex + Claude",
+        total: "612k",
+        scan: "217 JSONL",
+        codex: "366k",
+        claude: "246k",
+        codexInput: "221k",
+        codexCache: "93k",
+        codexOutput: "52k",
+        claudeInput: "132k",
+        claudeCache: "74k",
+        claudeOutput: "40k",
+        codexShare: 60,
+        claudeShare: 40
+      },
+      today: {
+        label: "今天 · Codex + Claude",
+        total: "148k",
+        scan: "38 JSONL",
+        codex: "83k",
+        claude: "65k",
+        codexInput: "49k",
+        codexCache: "22k",
+        codexOutput: "12k",
+        claudeInput: "34k",
+        claudeCache: "19k",
+        claudeOutput: "12k",
+        codexShare: 56,
+        claudeShare: 44
+      }
+    };
+
+    const ids = [
+      "rangeLabel", "totalTokens", "scanStatus", "codexTokens", "claudeTokens",
+      "codexInput", "codexCache", "codexOutput", "claudeInput", "claudeCache",
+      "claudeOutput", "trayTotal", "trayCodex", "trayClaude"
+    ];
+
+    const nodes = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
+    const codexShare = document.getElementById("codexShare");
+    const claudeShare = document.getElementById("claudeShare");
+    const trayCodexBar = document.getElementById("trayCodexBar");
+    const trayClaudeBar = document.getElementById("trayClaudeBar");
+
+    function applyRange(rangeKey) {
+      const data = ranges[rangeKey];
+      nodes.rangeLabel.textContent = data.label;
+      nodes.totalTokens.textContent = data.total;
+      nodes.scanStatus.textContent = data.scan;
+      nodes.codexTokens.textContent = data.codex;
+      nodes.claudeTokens.textContent = data.claude;
+      nodes.codexInput.textContent = data.codexInput;
+      nodes.codexCache.textContent = data.codexCache;
+      nodes.codexOutput.textContent = data.codexOutput;
+      nodes.claudeInput.textContent = data.claudeInput;
+      nodes.claudeCache.textContent = data.claudeCache;
+      nodes.claudeOutput.textContent = data.claudeOutput;
+      nodes.trayTotal.textContent = data.total;
+      nodes.trayCodex.textContent = data.codex;
+      nodes.trayClaude.textContent = data.claude;
+      codexShare.style.width = data.codexShare + "%";
+      claudeShare.style.width = data.claudeShare + "%";
+      trayCodexBar.style.width = data.codexShare + "%";
+      trayClaudeBar.style.width = data.claudeShare + "%";
+    }
+
+    document.querySelectorAll(".segment").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".segment").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        applyRange(button.dataset.range);
+      });
+    });
+  </script>
+</body>
+</html>
