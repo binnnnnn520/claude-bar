@@ -1,4 +1,5 @@
 pub mod claude;
+pub mod codex;
 pub mod roots;
 pub mod time;
 pub mod types;
@@ -86,5 +87,33 @@ mod tests {
         assert!(super::claude::parse_claude_line(line)
             .expect("valid json should parse")
             .is_none());
+    }
+
+    #[test]
+    fn codex_parser_extracts_payload_token_count() {
+        let line = r#"{"timestamp":"2026-05-01T12:00:00Z","type":"event_msg","payload":{"type":"token_count","input_tokens":100,"cached_input_tokens":25,"output_tokens":40,"model":"gpt-5.3-codex"}}"#;
+        let parsed = super::codex::parse_codex_line(line)
+            .expect("valid json should parse")
+            .expect("usage should parse");
+
+        assert_eq!(parsed.bucket.input_tokens, 100);
+        assert_eq!(parsed.bucket.cached_input_tokens, 25);
+        assert_eq!(parsed.bucket.output_tokens, 40);
+        assert_eq!(parsed.bucket.total_tokens, 165);
+        assert_eq!(parsed.model.as_deref(), Some("gpt-5.3-codex"));
+    }
+
+    #[test]
+    fn codex_parser_skips_non_usage_rows() {
+        let line = r#"{"timestamp":"2026-05-01T12:00:00Z","type":"response_item","payload":{"type":"message","content":"hidden"}}"#;
+        assert!(super::codex::parse_codex_line(line)
+            .expect("valid json should parse")
+            .is_none());
+    }
+
+    #[test]
+    fn codex_parser_reports_malformed_json() {
+        let line = r#"{"timestamp":"2026-05-01T12:00:00Z","type":"event_msg""#;
+        assert!(super::codex::parse_codex_line(line).is_err());
     }
 }
