@@ -1,3 +1,4 @@
+pub mod claude;
 pub mod roots;
 pub mod time;
 pub mod types;
@@ -37,5 +38,25 @@ mod tests {
         assert_eq!(usage.bucket.input_tokens, 10);
         assert_eq!(usage.bucket.cached_input_tokens, 2);
         assert_eq!(usage.bucket.output_tokens, 5);
+    }
+
+    #[test]
+    fn claude_parser_extracts_assistant_usage() {
+        let line = r#"{"type":"assistant","timestamp":"2026-05-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{"input_tokens":100,"cache_creation_input_tokens":20,"cache_read_input_tokens":30,"output_tokens":40}}}"#;
+        let parsed = super::claude::parse_claude_line(line).expect("usage should parse");
+
+        assert_eq!(parsed.bucket.input_tokens, 100);
+        assert_eq!(parsed.bucket.cache_creation_tokens, 20);
+        assert_eq!(parsed.bucket.cache_read_tokens, 30);
+        assert_eq!(parsed.bucket.output_tokens, 40);
+        assert_eq!(parsed.bucket.total_tokens, 190);
+        assert_eq!(parsed.model.as_deref(), Some("claude-sonnet"));
+        assert_eq!(parsed.dedupe_key.as_deref(), Some("msg_1"));
+    }
+
+    #[test]
+    fn claude_parser_skips_non_assistant_rows() {
+        let line = r#"{"type":"user","timestamp":"2026-05-01T12:00:00Z","message":{"content":"hidden"}}"#;
+        assert!(super::claude::parse_claude_line(line).is_none());
     }
 }
