@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FloatingPopover } from "./components/FloatingPopover";
 import { Dashboard } from "./components/Dashboard";
@@ -18,17 +18,26 @@ export default function App() {
   const [selectedWindow, setSelectedWindow] = useState<UsageWindow>("last30d");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const refreshRequestId = useRef(0);
 
   const refresh = useCallback(async () => {
+    const requestId = refreshRequestId.current + 1;
+    refreshRequestId.current = requestId;
     setIsLoading(true);
     setError(null);
     try {
       const next = await invoke<UsageSnapshot>("scan_usage", { window: selectedWindow });
-      setSnapshot(next);
+      if (refreshRequestId.current === requestId) {
+        setSnapshot(next);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (refreshRequestId.current === requestId) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
-      setIsLoading(false);
+      if (refreshRequestId.current === requestId) {
+        setIsLoading(false);
+      }
     }
   }, [selectedWindow]);
 
