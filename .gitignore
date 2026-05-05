@@ -4,6 +4,5 @@ src-tauri/target/
 src-tauri/gen/
 .env
 .env.local
-.worktrees/
-.superpowers/brainstorm/[0-9]*-*/
+.superpowers/brainstorm/*/state/
 *.log
