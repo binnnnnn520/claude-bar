@@ -123,7 +123,13 @@ fn usage_source(payload: &Value) -> (&Value, UsageSourceKind) {
 }
 
 fn codex_total_tokens(usage: &Value, input_tokens: u64, output_tokens: u64) -> u64 {
-    input_tokens + output_tokens + reasoning_output_tokens(usage)
+    let output_component = if output_tokens > 0 {
+        output_tokens
+    } else {
+        reasoning_output_tokens(usage)
+    };
+
+    input_tokens + output_component
 }
 
 fn reasoning_output_tokens(usage: &Value) -> u64 {
@@ -137,13 +143,15 @@ fn reasoning_output_tokens(usage: &Value) -> u64 {
         ],
     );
 
-    let nested = usage
+    if flat > 0 {
+        return flat;
+    }
+
+    usage
         .get("output_tokens_details")
         .or_else(|| usage.get("outputTokensDetails"))
         .map(|details| number_at_any(details, &["reasoning_tokens", "reasoningTokens"]))
-        .unwrap_or(0);
-
-    flat + nested
+        .unwrap_or(0)
 }
 
 fn string_at_any(value: &Value, keys: &[&str]) -> Option<String> {

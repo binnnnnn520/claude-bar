@@ -576,6 +576,20 @@ mod tests {
     }
 
     #[test]
+    fn codex_parser_fallback_does_not_add_reasoning_when_output_is_present() {
+        let line = r#"{"timestamp":"2026-05-01T12:00:00Z","type":"event_msg","payload":{"type":"token_count","input_tokens":100,"cached_input_tokens":40,"output_tokens":20,"reasoning_output_tokens":7,"model":"gpt-5.3-codex"}}"#;
+        let parsed = super::codex::parse_codex_line(line)
+            .expect("valid json should parse")
+            .expect("usage should parse");
+
+        assert_eq!(parsed.bucket.input_tokens, 100);
+        assert_eq!(parsed.bucket.cached_input_tokens, 40);
+        assert_eq!(parsed.bucket.output_tokens, 20);
+        assert_eq!(parsed.bucket.total_tokens, 120);
+        assert_eq!(parsed.source_kind, super::codex::UsageSourceKind::Delta);
+    }
+
+    #[test]
     fn codex_parser_extracts_realistic_info_token_count() {
         let line = r#"{"timestamp":"2026-05-05T01:43:10.790Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":11054,"cached_input_tokens":6528,"output_tokens":78,"reasoning_output_tokens":60,"total_tokens":11132},"last_token_usage":{"input_tokens":11054,"cached_input_tokens":6528,"output_tokens":78,"reasoning_output_tokens":60,"total_tokens":11132},"model_context_window":258400},"rate_limits":{"limit_id":"codex"}}}"#;
         let parsed = super::codex::parse_codex_line(line)
