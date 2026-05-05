@@ -11,14 +11,18 @@ pub struct ParsedUsage {
     pub bucket: TokenBucket,
 }
 
-pub fn parse_claude_line(line: &str) -> Option<ParsedUsage> {
-    let value: Value = serde_json::from_str(line).ok()?;
+pub fn parse_claude_line(line: &str) -> Result<Option<ParsedUsage>, serde_json::Error> {
+    let value: Value = serde_json::from_str(line)?;
     if value.get("type").and_then(Value::as_str) != Some("assistant") {
-        return None;
+        return Ok(None);
     }
 
-    let message = value.get("message")?;
-    let usage = message.get("usage")?;
+    let Some(message) = value.get("message") else {
+        return Ok(None);
+    };
+    let Some(usage) = message.get("usage") else {
+        return Ok(None);
+    };
 
     let bucket = TokenBucket {
         input_tokens: usage
@@ -43,10 +47,10 @@ pub fn parse_claude_line(line: &str) -> Option<ParsedUsage> {
     .with_total();
 
     if bucket.total_tokens == 0 {
-        return None;
+        return Ok(None);
     }
 
-    Some(ParsedUsage {
+    Ok(Some(ParsedUsage {
         timestamp: parse_timestamp(&value),
         model: message.get("model").and_then(Value::as_str).map(str::to_owned),
         dedupe_key: message
@@ -55,5 +59,5 @@ pub fn parse_claude_line(line: &str) -> Option<ParsedUsage> {
             .or_else(|| value.get("requestId").and_then(Value::as_str))
             .map(str::to_owned),
         bucket,
-    })
+    }))
 }

@@ -43,7 +43,9 @@ mod tests {
     #[test]
     fn claude_parser_extracts_assistant_usage() {
         let line = r#"{"type":"assistant","timestamp":"2026-05-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{"input_tokens":100,"cache_creation_input_tokens":20,"cache_read_input_tokens":30,"output_tokens":40}}}"#;
-        let parsed = super::claude::parse_claude_line(line).expect("usage should parse");
+        let parsed = super::claude::parse_claude_line(line)
+            .expect("valid json should parse")
+            .expect("usage should parse");
 
         assert_eq!(parsed.bucket.input_tokens, 100);
         assert_eq!(parsed.bucket.cache_creation_tokens, 20);
@@ -57,6 +59,32 @@ mod tests {
     #[test]
     fn claude_parser_skips_non_assistant_rows() {
         let line = r#"{"type":"user","timestamp":"2026-05-01T12:00:00Z","message":{"content":"hidden"}}"#;
-        assert!(super::claude::parse_claude_line(line).is_none());
+        assert!(super::claude::parse_claude_line(line)
+            .expect("valid json should parse")
+            .is_none());
+    }
+
+    #[test]
+    fn claude_parser_reports_malformed_json() {
+        let line = r#"{"type":"assistant""#;
+        assert!(super::claude::parse_claude_line(line).is_err());
+    }
+
+    #[test]
+    fn claude_parser_uses_request_id_as_dedupe_fallback() {
+        let line = r#"{"type":"assistant","requestId":"req_1","timestamp":"2026-05-01T12:00:00Z","message":{"model":"claude-sonnet","usage":{"input_tokens":10,"output_tokens":5}}}"#;
+        let parsed = super::claude::parse_claude_line(line)
+            .expect("valid json should parse")
+            .expect("usage should parse");
+
+        assert_eq!(parsed.dedupe_key.as_deref(), Some("req_1"));
+    }
+
+    #[test]
+    fn claude_parser_skips_zero_token_usage() {
+        let line = r#"{"type":"assistant","timestamp":"2026-05-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{}}}"#;
+        assert!(super::claude::parse_claude_line(line)
+            .expect("valid json should parse")
+            .is_none());
     }
 }
