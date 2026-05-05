@@ -1,4 +1,4 @@
-import type { DailyUsage, ProviderId, ProviderUsage, TokenBucket, UsageSnapshot } from "../types";
+import type { DailyUsage, ModelUsage, ProviderId, ProviderUsage, TokenBucket, UsageSnapshot } from "../types";
 
 type UsageWindow = UsageSnapshot["window"];
 
@@ -7,7 +7,6 @@ interface FloatingPopoverProps {
   selectedWindow: UsageWindow;
   onWindowChange: (window: UsageWindow) => void;
   onRefresh: () => void;
-  onOpenDashboard: () => void;
   isLoading: boolean;
   error: string | null;
 }
@@ -154,6 +153,50 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ModelRows({ models }: { models: ModelUsage[] }) {
+  const visible = models.slice(0, 6);
+  if (visible.length === 0) {
+    return <div className="empty-row">No model rows</div>;
+  }
+
+  return (
+    <div className="model-list">
+      {visible.map((model) => (
+        <div className="model-row" key={model.model}>
+          <span title={model.model}>{model.model}</span>
+          <strong>{formatTokens(model.totalTokens)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DailyRows({ days }: { days: DailyUsage[] }) {
+  const visible = days.slice(-8).reverse();
+  const max = Math.max(0, ...visible.map((day) => day.totalTokens));
+
+  if (visible.length === 0) {
+    return <div className="empty-row">No daily rows</div>;
+  }
+
+  return (
+    <div className="daily-list">
+      {visible.map((day) => {
+        const width = max > 0 ? Math.max(4, Math.round((day.totalTokens / max) * 100)) : 0;
+        return (
+          <div className="daily-row" key={day.date}>
+            <span>{day.date.slice(5)}</span>
+            <div className="daily-track" aria-hidden="true">
+              <i style={{ width: `${width}%` }} />
+            </div>
+            <strong>{formatTokens(day.totalTokens)}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProviderSection({ item, id }: { item?: ProviderUsage; id: ProviderId }) {
   const warnings = item?.parseWarnings ?? 0;
   const firstError = item?.errors[0];
@@ -186,6 +229,17 @@ function ProviderSection({ item, id }: { item?: ProviderUsage; id: ProviderId })
           Error: {firstError}
         </div>
       ) : null}
+
+      <div className="detail-columns">
+        <div>
+          <h2>Models</h2>
+          <ModelRows models={item?.models ?? []} />
+        </div>
+        <div>
+          <h2>Trend</h2>
+          <DailyRows days={item?.daily ?? []} />
+        </div>
+      </div>
     </section>
   );
 }
@@ -195,7 +249,6 @@ export function FloatingPopover({
   selectedWindow,
   onWindowChange,
   onRefresh,
-  onOpenDashboard,
   isLoading,
   error
 }: FloatingPopoverProps) {
@@ -204,12 +257,12 @@ export function FloatingPopover({
   return (
     <main className="popover-stage">
       <section className="floating-popover" aria-label="Local token popover" aria-busy={isLoading}>
-        <header className="popover-head">
-          <div className="title-group">
+        <header className="popover-head" data-tauri-drag-region>
+          <div className="title-group" data-tauri-drag-region>
             <div className="ledger-glyph" aria-hidden="true">
               <span />
             </div>
-            <div className="app-title">
+            <div className="app-title" data-tauri-drag-region>
               <strong>Token Ledger</strong>
               <span>{isLoading ? "Scanning" : `Scanned ${formatScanTime(snapshot.scannedAt)}`}</span>
             </div>
@@ -249,10 +302,6 @@ export function FloatingPopover({
         </div>
 
         <footer className="popover-footer">
-          <button className="primary-button" type="button" onClick={onOpenDashboard} title="Open usage dashboard">
-            Dashboard
-            <span className="arrow-icon" aria-hidden="true" />
-          </button>
           <span className="footer-status">{snapshot.providers.length} local providers</span>
         </footer>
       </section>

@@ -76,7 +76,7 @@ button:disabled {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   border: 1px solid var(--line-strong);
-  border-radius: 0 8px 0 0;
+  border-radius: 8px;
   background: rgba(255, 250, 242, 0.98);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -93,8 +93,10 @@ button:disabled {
 }
 
 .popover-head {
-  min-height: 44px;
-  padding: 7px 10px;
+  min-height: 58px;
+  padding: 10px 16px;
+  cursor: move;
+  user-select: none;
 }
 
 .title-group {
@@ -105,8 +107,8 @@ button:disabled {
 }
 
 .ledger-glyph {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -153,7 +155,7 @@ button:disabled {
   display: block;
   color: #34291f;
   font-family: Georgia, "Times New Roman", "Songti SC", serif;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
   line-height: 1.1;
   white-space: nowrap;
@@ -161,7 +163,7 @@ button:disabled {
 
 .app-title span {
   display: block;
-  max-width: 210px;
+  max-width: 280px;
   margin-top: 3px;
   overflow: hidden;
   color: var(--muted);
@@ -223,9 +225,9 @@ button:disabled {
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 12px;
   overflow: hidden;
-  padding: 8px 10px 6px;
+  padding: 14px 16px 10px;
 }
 
 .window-tabs {
@@ -242,7 +244,7 @@ button:disabled {
 
 .window-tabs button {
   min-width: 0;
-  height: 24px;
+  height: 31px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -287,7 +289,7 @@ button:disabled {
   margin-top: 4px;
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 27px;
+  font-size: 42px;
   font-weight: 700;
   line-height: 0.98;
   overflow-wrap: anywhere;
@@ -305,11 +307,11 @@ button:disabled {
 
 .share-wrap {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .share-bar {
-  height: 8px;
+  height: 11px;
   display: flex;
   overflow: hidden;
   border: 1px solid #ddceb9;
@@ -383,8 +385,8 @@ button:disabled {
 
 .providers {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .provider-panel,
@@ -397,15 +399,15 @@ button:disabled {
 
 .provider-panel {
   display: grid;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .provider-line {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
+  gap: 10px;
 }
 
 .provider-name {
@@ -420,13 +422,13 @@ button:disabled {
 .provider-total {
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .spark-bars {
-  height: 12px;
+  height: 24px;
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(14, minmax(2px, 1fr));
@@ -449,7 +451,7 @@ button:disabled {
 }
 
 .metric-grid {
-  display: none;
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
@@ -492,11 +494,10 @@ button:disabled {
 
 .popover-footer {
   min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 10px 8px;
+  justify-content: flex-end;
+  padding: 8px 16px 10px;
   border-top: 1px solid var(--line);
   background: rgba(248, 240, 228, 0.78);
 }

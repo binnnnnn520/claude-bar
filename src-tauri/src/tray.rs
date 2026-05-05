@@ -1,36 +1,20 @@
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{App, AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, Size, WebviewWindow};
+use tauri::{App, AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, Size, WebviewWindow, WindowEvent};
 
-const COMPACT_WIDTH: u32 = 360;
-const COMPACT_HEIGHT: u32 = 244;
-const DASHBOARD_WIDTH: u32 = 920;
-const DASHBOARD_HEIGHT: u32 = 720;
+const PANEL_WIDTH: u32 = 820;
+const PANEL_HEIGHT: u32 = 680;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct SavedWindowPosition {
+    x: i32,
+    y: i32,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PanelMode {
-    Compact,
-    Dashboard,
-}
-
-impl PanelMode {
-    pub fn parse(value: &str) -> Result<Self, String> {
-        match value {
-            "compact" => Ok(Self::Compact),
-            "dashboard" => Ok(Self::Dashboard),
-            other => Err(format!("Unsupported panel mode: {other}")),
-        }
-    }
-
-    fn size(self) -> (u32, u32) {
-        match self {
-            Self::Compact => (COMPACT_WIDTH, COMPACT_HEIGHT),
-            Self::Dashboard => (DASHBOARD_WIDTH, DASHBOARD_HEIGHT),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
 struct MonitorBounds {
     x: i32,
     y: i32,
@@ -57,45 +41,45 @@ pub fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
-                position,
                 ..
             } = event
             {
-                toggle_main_window(&handle, position.x as i32, position.y as i32);
+                toggle_main_window(&handle);
             }
         })
         .build(app)?;
 
     if let Some(window) = app.get_webview_window("main") {
-        show_panel_mode(&window, PanelMode::Compact, None)?;
+        let path = saved_position_path(app.handle());
+        let saved = path.as_deref().and_then(load_saved_position);
+        show_panel(&window, saved)?;
+        remember_window_position(&window, path);
     }
 
     Ok(())
 }
 
-fn toggle_main_window<R: Runtime>(app: &AppHandle<R>, x: i32, y: i32) {
+fn toggle_main_window<R: Runtime>(app: &AppHandle<R>) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
 
-    let _ = show_panel_mode(&window, PanelMode::Compact, Some((x, y)));
+    if window.is_visible().unwrap_or(false) {
+        let _ = window.hide();
+        return;
+    }
+
+    let path = saved_position_path(app);
+    let saved = path.as_deref().and_then(load_saved_position);
+    let _ = show_panel(&window, saved);
 }
 
-pub fn set_panel_mode<R: Runtime>(window: &WebviewWindow<R>, mode: PanelMode) -> tauri::Result<()> {
-    let (width, height) = mode.size();
-    window.set_size(Size::Physical(PhysicalSize::new(width, height)))?;
-    position_panel(window, width as i32, height as i32, None)
-}
-
-fn show_panel_mode<R: Runtime>(
+fn show_panel<R: Runtime>(
     window: &WebviewWindow<R>,
-    mode: PanelMode,
-    anchor: Option<(i32, i32)>,
+    saved: Option<SavedWindowPosition>,
 ) -> tauri::Result<()> {
-    let (width, height) = mode.size();
-    window.set_size(Size::Physical(PhysicalSize::new(width, height)))?;
-    position_panel(window, width as i32, height as i32, anchor)?;
-
+    window.set_size(Size::Physical(PhysicalSize::new(PANEL_WIDTH, PANEL_HEIGHT)))?;
+    position_panel(window, PANEL_WIDTH as i32, PANEL_HEIGHT as i32, saved)?;
     window.show()?;
     window.set_focus()?;
     Ok(())
@@ -105,14 +89,33 @@ fn position_panel<R: Runtime>(
     window: &WebviewWindow<R>,
     window_width: i32,
     window_height: i32,
-    anchor: Option<(i32, i32)>,
+    saved: Option<SavedWindowPosition>,
 ) -> tauri::Result<()> {
-    let bounds = anchor
-        .and_then(|(x, y)| monitor_bounds_for_point(window, x, y))
-        .or_else(|| monitor_bounds_for_window(window));
-    let (target_x, target_y) = popover_position(0, 0, window_width, window_height, bounds);
+    let bounds = saved
+        .and_then(|position| monitor_bounds_for_point(window, position.x, position.y).map(|bounds| (position, bounds)))
+        .map(|(position, bounds)| (Some(position), Some(bounds)))
+        .unwrap_or_else(|| (saved, monitor_bounds_for_window(window)));
+    let (target_x, target_y) = panel_position(bounds.0, window_width, window_height, bounds.1);
 
     window.set_position(PhysicalPosition::new(target_x, target_y))
+}
+
+fn remember_window_position<R: Runtime>(window: &WebviewWindow<R>, path: Option<PathBuf>) {
+    let Some(path) = path else {
+        return;
+    };
+
+    window.on_window_event(move |event| {
+        if let WindowEvent::Moved(position) = event {
+            let _ = save_window_position(
+                &path,
+                SavedWindowPosition {
+                    x: position.x,
+                    y: position.y,
+                },
+            );
+        }
+    });
 }
 
 fn monitor_bounds_for_point<R: Runtime>(window: &WebviewWindow<R>, x: i32, y: i32) -> Option<MonitorBounds> {
@@ -155,30 +158,54 @@ fn monitor_bounds_for_window<R: Runtime>(window: &WebviewWindow<R>) -> Option<Mo
     })
 }
 
-fn popover_position(
-    x: i32,
-    y: i32,
+fn panel_position(
+    saved: Option<SavedWindowPosition>,
     window_width: i32,
     window_height: i32,
     bounds: Option<MonitorBounds>,
 ) -> (i32, i32) {
     let Some(bounds) = bounds else {
+        let Some(saved) = saved else {
+            return (0, 0);
+        };
+        return (saved.x.max(0), saved.y.max(0));
+    };
+
+    let max_x = (bounds.x + bounds.width - window_width).max(bounds.x);
+    let max_y = (bounds.y + bounds.height - window_height).max(bounds.y);
+    let Some(saved) = saved else {
         return (
-            (x - window_width).max(0),
-            (y - window_height).max(0),
+            bounds.x + ((bounds.width - window_width).max(0) / 2),
+            bounds.y + ((bounds.height - window_height).max(0) / 2),
         );
     };
 
-    let max_y = (bounds.y + bounds.height - window_height).max(bounds.y);
-    let target_x = (bounds.x + bounds.width - window_width).max(bounds.x);
-    let target_y = max_y;
+    (saved.x.clamp(bounds.x, max_x), saved.y.clamp(bounds.y, max_y))
+}
 
-    (target_x, target_y)
+fn saved_position_path<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|path| path.join("window-position.json"))
+}
+
+fn load_saved_position(path: &Path) -> Option<SavedWindowPosition> {
+    let content = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn save_window_position(path: &Path, position: SavedWindowPosition) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let content = serde_json::to_string(&position).unwrap_or_else(|_| "{}".to_string());
+    fs::write(path, content)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{popover_position, MonitorBounds};
+    use super::{panel_position, SavedWindowPosition, MonitorBounds};
 
     const PRIMARY: MonitorBounds = MonitorBounds {
         x: 0,
@@ -188,28 +215,37 @@ mod tests {
     };
 
     #[test]
-    fn anchors_window_to_monitor_bottom_right() {
-        assert_eq!(popover_position(1200, 900, 360, 244, Some(PRIMARY)), (920, 716));
+    fn restores_user_dragged_position_inside_monitor() {
+        let saved = SavedWindowPosition { x: 318, y: 142 };
+        assert_eq!(panel_position(Some(saved), 760, 640, Some(PRIMARY)), (318, 142));
     }
 
     #[test]
-    fn ignores_floating_tray_popup_click_position() {
-        assert_eq!(popover_position(100, 400, 360, 244, Some(PRIMARY)), (920, 716));
+    fn clamps_saved_position_to_visible_monitor_area() {
+        let saved = SavedWindowPosition { x: 1100, y: 900 };
+        assert_eq!(panel_position(Some(saved), 760, 640, Some(PRIMARY)), (520, 320));
     }
 
     #[test]
-    fn anchors_to_right_edge_of_current_monitor() {
+    fn centers_when_no_saved_position_exists() {
+        assert_eq!(panel_position(None, 760, 640, Some(PRIMARY)), (260, 160));
+    }
+
+    #[test]
+    fn restores_position_on_current_monitor_with_negative_origin() {
         let secondary = MonitorBounds {
             x: -1920,
             y: 0,
             width: 1920,
             height: 1080,
         };
-        assert_eq!(popover_position(-200, 900, 920, 720, Some(secondary)), (-920, 360));
+        let saved = SavedWindowPosition { x: -1500, y: 240 };
+        assert_eq!(panel_position(Some(saved), 760, 640, Some(secondary)), (-1500, 240));
     }
 
     #[test]
     fn keeps_legacy_origin_clamp_without_monitor_data() {
-        assert_eq!(popover_position(100, 400, 820, 720, None), (0, 0));
+        let saved = SavedWindowPosition { x: -20, y: 50 };
+        assert_eq!(panel_position(Some(saved), 760, 640, None), (0, 50));
     }
 }
