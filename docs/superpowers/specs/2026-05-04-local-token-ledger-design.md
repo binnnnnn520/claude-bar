@@ -46,11 +46,9 @@ The popover shows:
 - Per-provider input, cache, and output token buckets.
 - Small recent-activity sparkline per provider.
 - Last scan time.
-- Local-only badges: No auth and No network.
+- Local-only badge.
 - Actions:
   - Refresh scan.
-  - Pin floating window.
-  - Close.
   - Open full dashboard.
 
 The full dashboard is secondary. It can reuse the broader direction from `ui-token-ledger.html`, but the tray popover is the main MVP target.
@@ -138,11 +136,15 @@ Expected behavior:
 
 - Click tray icon to show the popover near the tray area.
 - Popover is frameless, fixed-size, shadowed, and not shown as a normal taskbar window.
-- Losing focus closes the popover unless it is pinned.
-- `Esc` closes the popover.
-- Pin action keeps the window visible and always on top.
 - Dashboard action opens the larger app window.
 - Refresh action runs a local rescan.
+
+Future window-behavior enhancements:
+
+- Close on blur.
+- `Esc` closes the popover.
+- Pin action keeps the popover visible and always on top.
+- Explicit close action inside the popover.
 
 Positioning should account for:
 
