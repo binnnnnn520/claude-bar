@@ -7,7 +7,7 @@ pub mod types;
 use self::roots::discover_roots;
 use self::time::{codex_date_from_path, cutoff_last_30_days, date_key};
 use self::types::{ProviderId, ProviderUsage, UsageSnapshot};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -138,15 +138,25 @@ where
             bucket,
         } = parsed;
 
-        if let (Some(timestamp), Some(cutoff)) = (timestamp.as_ref(), cutoff.as_ref()) {
-            if timestamp < cutoff {
+        let fallback_date = fallback_date.clone();
+
+        if let Some(cutoff) = cutoff.as_ref() {
+            let timestamp_before_cutoff = timestamp
+                .as_ref()
+                .is_some_and(|timestamp| timestamp < cutoff);
+            let fallback_before_cutoff = timestamp.is_none()
+                && fallback_date
+                    .as_deref()
+                    .is_some_and(|date| fallback_date_before_cutoff(date, cutoff));
+
+            if timestamp_before_cutoff || fallback_before_cutoff {
                 continue;
             }
         }
 
         let date = timestamp
             .map(date_key)
-            .or_else(|| fallback_date.clone())
+            .or(fallback_date)
             .unwrap_or_else(|| "unknown".to_string());
         usage.add_daily_bucket(date, bucket.clone());
         if let Some(model) = model {
@@ -186,14 +196,14 @@ where
             bucket,
         } = parsed;
 
-        if let Some(key) = dedupe_key {
-            if !seen.insert(key) {
+        if let (Some(timestamp), Some(cutoff)) = (timestamp.as_ref(), cutoff.as_ref()) {
+            if timestamp < cutoff {
                 continue;
             }
         }
 
-        if let (Some(timestamp), Some(cutoff)) = (timestamp.as_ref(), cutoff.as_ref()) {
-            if timestamp < cutoff {
+        if let Some(key) = dedupe_key {
+            if !seen.insert(key) {
                 continue;
             }
         }
@@ -211,12 +221,35 @@ where
     found_usage
 }
 
+fn fallback_date_before_cutoff(fallback_date: &str, cutoff: &DateTime<Utc>) -> bool {
+    matches!(
+        NaiveDate::parse_from_str(fallback_date, "%Y-%m-%d"),
+        Ok(date) if date < cutoff.date_naive()
+    )
+}
+
 #[cfg(test)]
 pub fn scan_codex_lines_for_test(lines: Vec<String>) -> ProviderUsage {
     let mut usage = ProviderUsage::empty(ProviderId::Codex);
     usage.files_scanned = 1;
 
     if scan_codex_lines(lines, None, None, &mut usage) {
+        usage.files_with_usage = 1;
+    }
+
+    usage.finalize()
+}
+
+#[cfg(test)]
+pub fn scan_codex_lines_for_test_with_cutoff_and_fallback_date(
+    lines: Vec<String>,
+    cutoff: DateTime<Utc>,
+    fallback_date: Option<String>,
+) -> ProviderUsage {
+    let mut usage = ProviderUsage::empty(ProviderId::Codex);
+    usage.files_scanned = 1;
+
+    if scan_codex_lines(lines, Some(cutoff), fallback_date, &mut usage) {
         usage.files_with_usage = 1;
     }
 
@@ -236,8 +269,30 @@ pub fn scan_claude_lines_for_test(lines: Vec<String>) -> ProviderUsage {
 }
 
 #[cfg(test)]
+pub fn scan_claude_lines_for_test_with_cutoff(
+    lines: Vec<String>,
+    cutoff: DateTime<Utc>,
+) -> ProviderUsage {
+    let mut usage = ProviderUsage::empty(ProviderId::Claude);
+    usage.files_scanned = 1;
+
+    if scan_claude_lines(lines, Some(cutoff), &mut usage) {
+        usage.files_with_usage = 1;
+    }
+
+    usage.finalize()
+}
+
+#[cfg(test)]
 mod tests {
     use super::types::{ProviderId, ProviderUsage, TokenBucket};
+    use chrono::{DateTime, Utc};
+
+    fn utc_timestamp(raw: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(raw)
+            .expect("timestamp should parse")
+            .with_timezone(&Utc)
+    }
 
     #[test]
     fn token_bucket_total_includes_input_cache_and_output() {
@@ -326,6 +381,48 @@ mod tests {
         assert_eq!(usage.daily[0].bucket.total_tokens, 35);
         assert_eq!(usage.models[0].model, "gpt-5.3-codex");
         assert_eq!(usage.models[0].bucket.total_tokens, 35);
+    }
+
+    #[test]
+    fn scan_claude_lines_dedupes_after_timestamp_cutoff() {
+        let lines = vec![
+            r#"{"type":"assistant","timestamp":"2026-04-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{"input_tokens":100,"output_tokens":50}}}"#.to_string(),
+            r#"{"type":"assistant","timestamp":"2026-05-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{"input_tokens":20,"output_tokens":7}}}"#.to_string(),
+        ];
+
+        let usage = super::scan_claude_lines_for_test_with_cutoff(
+            lines,
+            utc_timestamp("2026-04-15T00:00:00Z"),
+        );
+
+        assert_eq!(usage.files_scanned, 1);
+        assert_eq!(usage.files_with_usage, 1);
+        assert_eq!(usage.bucket.input_tokens, 20);
+        assert_eq!(usage.bucket.output_tokens, 7);
+        assert_eq!(usage.bucket.total_tokens, 27);
+        assert_eq!(usage.models[0].bucket.total_tokens, 27);
+    }
+
+    #[test]
+    fn scan_codex_lines_skips_old_path_date_fallback_without_timestamp() {
+        let lines = vec![
+            r#"{"type":"event_msg","payload":{"type":"token_count","input_tokens":10,"output_tokens":5,"model":"gpt-5.3-codex"}}"#.to_string(),
+        ];
+        let fallback_date = super::time::codex_date_from_path(std::path::Path::new(
+            "sessions/2026/04/01/session.jsonl",
+        ));
+
+        let usage = super::scan_codex_lines_for_test_with_cutoff_and_fallback_date(
+            lines,
+            utc_timestamp("2026-04-15T00:00:00Z"),
+            fallback_date,
+        );
+
+        assert_eq!(usage.files_scanned, 1);
+        assert_eq!(usage.files_with_usage, 0);
+        assert_eq!(usage.bucket.total_tokens, 0);
+        assert!(usage.daily.is_empty());
+        assert!(usage.models.is_empty());
     }
 
     #[test]
