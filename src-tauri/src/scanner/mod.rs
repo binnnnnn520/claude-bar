@@ -33,9 +33,9 @@ mod tests {
             total_tokens: 17,
         });
 
-        assert_eq!(usage.total_tokens, 17);
-        assert_eq!(usage.input_tokens, 10);
-        assert_eq!(usage.cached_input_tokens, 2);
-        assert_eq!(usage.output_tokens, 5);
+        assert_eq!(usage.bucket.total_tokens, 17);
+        assert_eq!(usage.bucket.input_tokens, 10);
+        assert_eq!(usage.bucket.cached_input_tokens, 2);
+        assert_eq!(usage.bucket.output_tokens, 5);
     }
 }

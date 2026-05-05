@@ -1,6 +1,5 @@
 use serde::Serialize;
 use std::collections::BTreeMap;
-use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -123,20 +122,6 @@ impl ProviderUsage {
         self.models
             .sort_by(|a, b| b.bucket.total_tokens.cmp(&a.bucket.total_tokens));
         self
-    }
-}
-
-impl Deref for ProviderUsage {
-    type Target = TokenBucket;
-
-    fn deref(&self) -> &Self::Target {
-        &self.bucket
-    }
-}
-
-impl DerefMut for ProviderUsage {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.bucket
     }
 }
 
