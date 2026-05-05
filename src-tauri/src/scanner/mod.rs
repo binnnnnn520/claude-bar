@@ -104,6 +104,53 @@ mod tests {
     }
 
     #[test]
+    fn codex_parser_extracts_realistic_info_token_count() {
+        let line = r#"{"timestamp":"2026-05-05T01:43:10.790Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":11054,"cached_input_tokens":6528,"output_tokens":78,"reasoning_output_tokens":60,"total_tokens":11132},"last_token_usage":{"input_tokens":11054,"cached_input_tokens":6528,"output_tokens":78,"reasoning_output_tokens":60,"total_tokens":11132},"model_context_window":258400},"rate_limits":{"limit_id":"codex"}}}"#;
+        let parsed = super::codex::parse_codex_line(line)
+            .expect("valid json should parse")
+            .expect("usage should parse");
+
+        assert_eq!(parsed.bucket.input_tokens, 11054);
+        assert_eq!(parsed.bucket.cached_input_tokens, 6528);
+        assert_eq!(parsed.bucket.output_tokens, 78);
+        assert_eq!(parsed.bucket.total_tokens, 11132);
+    }
+
+    #[test]
+    fn codex_parser_prefers_last_token_usage_for_row_aggregation() {
+        let line = r#"{"timestamp":"2026-05-05T01:43:10.790Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1000,"cached_input_tokens":500,"output_tokens":100,"total_tokens":1100},"last_token_usage":{"input_tokens":10,"cached_input_tokens":5,"output_tokens":2,"total_tokens":12}}}}"#;
+        let parsed = super::codex::parse_codex_line(line)
+            .expect("valid json should parse")
+            .expect("usage should parse");
+
+        assert_eq!(parsed.bucket.input_tokens, 10);
+        assert_eq!(parsed.bucket.cached_input_tokens, 5);
+        assert_eq!(parsed.bucket.output_tokens, 2);
+        assert_eq!(parsed.bucket.total_tokens, 12);
+    }
+
+    #[test]
+    fn codex_parser_falls_back_to_total_token_usage() {
+        let line = r#"{"timestamp":"2026-05-05T01:43:10.790Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":20,"cached_input_tokens":8,"output_tokens":4,"total_tokens":24}}}}"#;
+        let parsed = super::codex::parse_codex_line(line)
+            .expect("valid json should parse")
+            .expect("usage should parse");
+
+        assert_eq!(parsed.bucket.input_tokens, 20);
+        assert_eq!(parsed.bucket.cached_input_tokens, 8);
+        assert_eq!(parsed.bucket.output_tokens, 4);
+        assert_eq!(parsed.bucket.total_tokens, 24);
+    }
+
+    #[test]
+    fn codex_parser_skips_token_count_with_null_info_and_rate_limits_only() {
+        let line = r#"{"timestamp":"2026-05-05T01:43:10.790Z","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"limit_id":"codex"}}}"#;
+        assert!(super::codex::parse_codex_line(line)
+            .expect("valid json should parse")
+            .is_none());
+    }
+
+    #[test]
     fn codex_parser_skips_non_usage_rows() {
         let line = r#"{"timestamp":"2026-05-01T12:00:00Z","type":"response_item","payload":{"type":"message","content":"hidden"}}"#;
         assert!(super::codex::parse_codex_line(line)

@@ -31,7 +31,7 @@ pub fn parse_codex_line(line: &str) -> Result<Option<ParsedUsage>, serde_json::E
         return Ok(None);
     }
 
-    let usage = payload.get("usage").unwrap_or(payload);
+    let usage = usage_source(payload);
     let bucket = TokenBucket {
         input_tokens: number_at_any(
             usage,
@@ -93,6 +93,17 @@ fn number_at_any(value: &Value, keys: &[&str]) -> u64 {
         }
     }
     0
+}
+
+fn usage_source(payload: &Value) -> &Value {
+    let info = payload.get("info");
+
+    // Per-row aggregation should use the increment for this row; total_token_usage
+    // is cumulative and would over-count if summed across token_count events.
+    info.and_then(|info| info.get("last_token_usage"))
+        .or_else(|| info.and_then(|info| info.get("total_token_usage")))
+        .or_else(|| payload.get("usage"))
+        .unwrap_or(payload)
 }
 
 fn string_at_any(value: &Value, keys: &[&str]) -> Option<String> {
