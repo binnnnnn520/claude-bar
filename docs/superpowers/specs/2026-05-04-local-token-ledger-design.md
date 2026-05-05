@@ -8,7 +8,7 @@ Build a Windows tray app that shows a Claude-inspired floating popover for local
 
 How many tokens did local Codex and Claude sessions use over the selected time window?
 
-The first supported window is the last 30 days. The UI may also expose Today and This Month once the scanner supports those buckets.
+The supported windows are last 30 days, current month, and today.
 
 ## Non-Goals
 
@@ -249,4 +249,14 @@ Manual checks:
 - Pin keeps the popover visible.
 - Dashboard button opens larger window.
 - Popover remains readable at 100%, 125%, and 150% Windows scaling.
+
+## Implementation Status
+
+The MVP follows the implementation plan and has implemented the local scanner, Tauri command, Claude-style popover/dashboard UI, and Windows tray toggle.
+
+Current supported windows:
+
+- Last 30 days
+- Current month
+- Today
 
