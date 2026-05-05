@@ -4,6 +4,237 @@ pub mod roots;
 pub mod time;
 pub mod types;
 
+use self::roots::discover_roots;
+use self::time::{codex_date_from_path, cutoff_last_30_days, date_key};
+use self::types::{ProviderId, ProviderUsage, UsageSnapshot};
+use chrono::{DateTime, Utc};
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
+
+pub fn scan_usage(window: &str) -> UsageSnapshot {
+    let now = Utc::now();
+    let cutoff = cutoff_last_30_days(now);
+    let roots = discover_roots();
+
+    let codex = scan_codex_roots(&roots.codex_roots, cutoff).finalize();
+    let claude = scan_claude_roots(&roots.claude_roots, cutoff).finalize();
+
+    UsageSnapshot {
+        window: window.to_owned(),
+        scanned_at: now.to_rfc3339(),
+        providers: vec![codex, claude],
+    }
+}
+
+fn jsonl_files(roots: &[PathBuf]) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+
+    for root in roots {
+        if !root.exists() {
+            continue;
+        }
+
+        for entry in WalkDir::new(root).follow_links(false).into_iter().flatten() {
+            let path = entry.path();
+            if path.is_file()
+                && path
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("jsonl"))
+            {
+                files.push(path.to_path_buf());
+            }
+        }
+    }
+
+    files
+}
+
+fn scan_codex_roots(roots: &[PathBuf], cutoff: DateTime<Utc>) -> ProviderUsage {
+    let mut usage = ProviderUsage::empty(ProviderId::Codex);
+
+    for path in jsonl_files(roots) {
+        usage.files_scanned += 1;
+        scan_codex_file(&path, cutoff, &mut usage);
+    }
+
+    usage
+}
+
+fn scan_claude_roots(roots: &[PathBuf], cutoff: DateTime<Utc>) -> ProviderUsage {
+    let mut usage = ProviderUsage::empty(ProviderId::Claude);
+
+    for path in jsonl_files(roots) {
+        usage.files_scanned += 1;
+        scan_claude_file(&path, cutoff, &mut usage);
+    }
+
+    usage
+}
+
+fn scan_codex_file(path: &Path, cutoff: DateTime<Utc>, usage: &mut ProviderUsage) {
+    let Ok(file) = File::open(path) else {
+        usage.errors.push(format!("Cannot read {}", path.display()));
+        return;
+    };
+
+    let fallback_date = codex_date_from_path(path);
+    let found_usage = scan_codex_lines(
+        BufReader::new(file).lines().map_while(Result::ok),
+        Some(cutoff),
+        fallback_date,
+        usage,
+    );
+
+    if found_usage {
+        usage.files_with_usage += 1;
+    }
+}
+
+fn scan_claude_file(path: &Path, cutoff: DateTime<Utc>, usage: &mut ProviderUsage) {
+    let Ok(file) = File::open(path) else {
+        usage.errors.push(format!("Cannot read {}", path.display()));
+        return;
+    };
+
+    let found_usage = scan_claude_lines(
+        BufReader::new(file).lines().map_while(Result::ok),
+        Some(cutoff),
+        usage,
+    );
+
+    if found_usage {
+        usage.files_with_usage += 1;
+    }
+}
+
+fn scan_codex_lines<I>(
+    lines: I,
+    cutoff: Option<DateTime<Utc>>,
+    fallback_date: Option<String>,
+    usage: &mut ProviderUsage,
+) -> bool
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut found_usage = false;
+
+    for line in lines {
+        let parsed = match codex::parse_codex_line(&line) {
+            Ok(Some(parsed)) => parsed,
+            Ok(None) => continue,
+            Err(_) => {
+                usage.parse_warnings += 1;
+                continue;
+            }
+        };
+
+        let codex::ParsedUsage {
+            timestamp,
+            model,
+            bucket,
+        } = parsed;
+
+        if let (Some(timestamp), Some(cutoff)) = (timestamp.as_ref(), cutoff.as_ref()) {
+            if timestamp < cutoff {
+                continue;
+            }
+        }
+
+        let date = timestamp
+            .map(date_key)
+            .or_else(|| fallback_date.clone())
+            .unwrap_or_else(|| "unknown".to_string());
+        usage.add_daily_bucket(date, bucket.clone());
+        if let Some(model) = model {
+            usage.add_model_bucket(model, bucket);
+        }
+        found_usage = true;
+    }
+
+    found_usage
+}
+
+fn scan_claude_lines<I>(
+    lines: I,
+    cutoff: Option<DateTime<Utc>>,
+    usage: &mut ProviderUsage,
+) -> bool
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut found_usage = false;
+    let mut seen = HashSet::new();
+
+    for line in lines {
+        let parsed = match claude::parse_claude_line(&line) {
+            Ok(Some(parsed)) => parsed,
+            Ok(None) => continue,
+            Err(_) => {
+                usage.parse_warnings += 1;
+                continue;
+            }
+        };
+
+        let claude::ParsedUsage {
+            timestamp,
+            model,
+            dedupe_key,
+            bucket,
+        } = parsed;
+
+        if let Some(key) = dedupe_key {
+            if !seen.insert(key) {
+                continue;
+            }
+        }
+
+        if let (Some(timestamp), Some(cutoff)) = (timestamp.as_ref(), cutoff.as_ref()) {
+            if timestamp < cutoff {
+                continue;
+            }
+        }
+
+        let date = timestamp
+            .map(date_key)
+            .unwrap_or_else(|| "unknown".to_string());
+        usage.add_daily_bucket(date, bucket.clone());
+        if let Some(model) = model {
+            usage.add_model_bucket(model, bucket);
+        }
+        found_usage = true;
+    }
+
+    found_usage
+}
+
+#[cfg(test)]
+pub fn scan_codex_lines_for_test(lines: Vec<String>) -> ProviderUsage {
+    let mut usage = ProviderUsage::empty(ProviderId::Codex);
+    usage.files_scanned = 1;
+
+    if scan_codex_lines(lines, None, None, &mut usage) {
+        usage.files_with_usage = 1;
+    }
+
+    usage.finalize()
+}
+
+#[cfg(test)]
+pub fn scan_claude_lines_for_test(lines: Vec<String>) -> ProviderUsage {
+    let mut usage = ProviderUsage::empty(ProviderId::Claude);
+    usage.files_scanned = 1;
+
+    if scan_claude_lines(lines, None, &mut usage) {
+        usage.files_with_usage = 1;
+    }
+
+    usage.finalize()
+}
+
 #[cfg(test)]
 mod tests {
     use super::types::{ProviderId, ProviderUsage, TokenBucket};
@@ -39,6 +270,62 @@ mod tests {
         assert_eq!(usage.bucket.input_tokens, 10);
         assert_eq!(usage.bucket.cached_input_tokens, 2);
         assert_eq!(usage.bucket.output_tokens, 5);
+    }
+
+    #[test]
+    fn scan_lines_aggregates_provider_usage() {
+        let lines = vec![
+            r#"{"type":"assistant","timestamp":"2026-05-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{"input_tokens":10,"output_tokens":5}}}"#.to_string(),
+            r#"{"type":"assistant","timestamp":"2026-05-01T12:01:00Z","message":{"id":"msg_2","model":"claude-sonnet","usage":{"input_tokens":20,"output_tokens":7}}}"#.to_string(),
+        ];
+
+        let usage = super::scan_claude_lines_for_test(lines);
+
+        assert_eq!(usage.files_scanned, 1);
+        assert_eq!(usage.files_with_usage, 1);
+        assert_eq!(usage.bucket.input_tokens, 30);
+        assert_eq!(usage.bucket.output_tokens, 12);
+        assert_eq!(usage.bucket.total_tokens, 42);
+        assert_eq!(usage.daily.len(), 1);
+        assert_eq!(usage.daily[0].bucket.total_tokens, 42);
+        assert_eq!(usage.models[0].model, "claude-sonnet");
+        assert_eq!(usage.models[0].bucket.total_tokens, 42);
+    }
+
+    #[test]
+    fn scan_lines_counts_malformed_json_parse_warnings() {
+        let lines = vec![
+            r#"{"type":"assistant""#.to_string(),
+            r#"{"type":"assistant","timestamp":"2026-05-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{"input_tokens":10,"output_tokens":5}}}"#.to_string(),
+        ];
+
+        let usage = super::scan_claude_lines_for_test(lines);
+
+        assert_eq!(usage.parse_warnings, 1);
+        assert_eq!(usage.files_scanned, 1);
+        assert_eq!(usage.files_with_usage, 1);
+        assert_eq!(usage.bucket.total_tokens, 15);
+    }
+
+    #[test]
+    fn scan_codex_lines_aggregates_last_token_usage_without_cumulative_overcount() {
+        let lines = vec![
+            r#"{"timestamp":"2026-05-01T12:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1000,"cached_input_tokens":500,"output_tokens":100,"total_tokens":1100},"last_token_usage":{"input_tokens":10,"cached_input_tokens":5,"output_tokens":2,"total_tokens":12}},"model":"gpt-5.3-codex"}}"#.to_string(),
+            r#"{"timestamp":"2026-05-01T12:01:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":2000,"cached_input_tokens":700,"output_tokens":200,"total_tokens":2200},"last_token_usage":{"input_tokens":20,"cached_input_tokens":7,"output_tokens":3,"total_tokens":23}},"model":"gpt-5.3-codex"}}"#.to_string(),
+        ];
+
+        let usage = super::scan_codex_lines_for_test(lines);
+
+        assert_eq!(usage.files_scanned, 1);
+        assert_eq!(usage.files_with_usage, 1);
+        assert_eq!(usage.bucket.input_tokens, 30);
+        assert_eq!(usage.bucket.cached_input_tokens, 12);
+        assert_eq!(usage.bucket.output_tokens, 5);
+        assert_eq!(usage.bucket.total_tokens, 35);
+        assert_eq!(usage.daily.len(), 1);
+        assert_eq!(usage.daily[0].bucket.total_tokens, 35);
+        assert_eq!(usage.models[0].model, "gpt-5.3-codex");
+        assert_eq!(usage.models[0].bucket.total_tokens, 35);
     }
 
     #[test]
