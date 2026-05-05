@@ -5,9 +5,9 @@ pub mod time;
 pub mod types;
 
 use self::roots::discover_roots;
-use self::time::{codex_date_from_path, cutoff_last_30_days, date_key};
+use self::time::{codex_date_from_path, cutoff_last_30_days, date_key, usage_window_cutoff};
 use self::types::{ProviderId, ProviderUsage, UsageSnapshot};
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Local, NaiveDate, Utc};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -15,8 +15,10 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 pub fn scan_usage(window: &str) -> UsageSnapshot {
-    let now = Utc::now();
-    let cutoff = cutoff_last_30_days(now);
+    let now = Local::now();
+    let scanned_at = now.with_timezone(&Utc);
+    let cutoff =
+        usage_window_cutoff(window, now).unwrap_or_else(|| cutoff_last_30_days(scanned_at.clone()));
     let roots = discover_roots();
 
     let codex = scan_codex_roots(&roots.codex_roots, cutoff).finalize();
@@ -24,7 +26,7 @@ pub fn scan_usage(window: &str) -> UsageSnapshot {
 
     UsageSnapshot {
         window: window.to_owned(),
-        scanned_at: now.to_rfc3339(),
+        scanned_at: scanned_at.to_rfc3339(),
         providers: vec![codex, claude],
     }
 }
@@ -224,7 +226,7 @@ where
 fn fallback_date_before_cutoff(fallback_date: &str, cutoff: &DateTime<Utc>) -> bool {
     matches!(
         NaiveDate::parse_from_str(fallback_date, "%Y-%m-%d"),
-        Ok(date) if date < cutoff.date_naive()
+        Ok(date) if date < cutoff.with_timezone(&Local).date_naive()
     )
 }
 
@@ -423,6 +425,21 @@ mod tests {
         assert_eq!(usage.bucket.total_tokens, 0);
         assert!(usage.daily.is_empty());
         assert!(usage.models.is_empty());
+    }
+
+    #[test]
+    fn fallback_path_date_compares_against_local_cutoff_date() {
+        let cutoff = utc_timestamp("2026-05-04T16:00:00Z");
+        let cutoff_date = cutoff.with_timezone(&chrono::Local).date_naive();
+        let previous_date = cutoff_date
+            .pred_opt()
+            .expect("cutoff date should have a previous day")
+            .format("%Y-%m-%d")
+            .to_string();
+        let cutoff_date = cutoff_date.format("%Y-%m-%d").to_string();
+
+        assert!(super::fallback_date_before_cutoff(&previous_date, &cutoff));
+        assert!(!super::fallback_date_before_cutoff(&cutoff_date, &cutoff));
     }
 
     #[test]
