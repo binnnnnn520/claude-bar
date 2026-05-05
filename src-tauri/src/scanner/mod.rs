@@ -6,7 +6,7 @@ pub mod types;
 
 use self::roots::discover_roots;
 use self::time::{codex_date_from_path, cutoff_last_30_days, date_key, usage_window_cutoff};
-use self::types::{ProviderId, ProviderUsage, UsageSnapshot};
+use self::types::{ProviderId, ProviderUsage, TokenBucket, UsageSnapshot};
 use chrono::{DateTime, Local, NaiveDate, Utc};
 use std::collections::HashSet;
 use std::fs::File;
@@ -123,6 +123,8 @@ where
     I: IntoIterator<Item = String>,
 {
     let mut found_usage = false;
+    let mut saw_delta_usage = false;
+    let mut cumulative_candidate: Option<CodexUsageRow> = None;
 
     for line in lines {
         let parsed = match codex::parse_codex_line(&line) {
@@ -138,6 +140,7 @@ where
             timestamp,
             model,
             bucket,
+            source_kind,
         } = parsed;
 
         let fallback_date = fallback_date.clone();
@@ -160,14 +163,48 @@ where
             .map(date_key)
             .or(fallback_date)
             .unwrap_or_else(|| "unknown".to_string());
-        usage.add_daily_bucket(date, bucket.clone());
-        if let Some(model) = model {
-            usage.add_model_bucket(model, bucket);
+
+        let row = CodexUsageRow {
+            date,
+            model,
+            bucket,
+        };
+
+        match source_kind {
+            codex::UsageSourceKind::Delta => {
+                add_codex_usage_row(usage, row);
+                saw_delta_usage = true;
+                found_usage = true;
+            }
+            codex::UsageSourceKind::Cumulative => {
+                if !saw_delta_usage {
+                    cumulative_candidate = Some(row);
+                }
+            }
         }
-        found_usage = true;
+    }
+
+    if !saw_delta_usage {
+        if let Some(row) = cumulative_candidate {
+            add_codex_usage_row(usage, row);
+            found_usage = true;
+        }
     }
 
     found_usage
+}
+
+struct CodexUsageRow {
+    date: String,
+    model: Option<String>,
+    bucket: TokenBucket,
+}
+
+fn add_codex_usage_row(usage: &mut ProviderUsage, row: CodexUsageRow) {
+    usage.add_daily_bucket(row.date, row.bucket.clone());
+    if let Some(model) = row.model {
+        usage.add_model_bucket(model, row.bucket);
+    }
 }
 
 fn scan_claude_lines<I>(
@@ -386,6 +423,25 @@ mod tests {
     }
 
     #[test]
+    fn scan_codex_lines_uses_one_cumulative_total_when_no_delta_rows() {
+        let lines = vec![
+            r#"{"timestamp":"2026-05-01T12:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":900,"cached_input_tokens":300,"output_tokens":100,"total_tokens":1000}},"model":"gpt-5.3-codex"}}"#.to_string(),
+            r#"{"timestamp":"2026-05-01T12:01:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1050,"cached_input_tokens":350,"output_tokens":150,"total_tokens":1200}},"model":"gpt-5.3-codex"}}"#.to_string(),
+        ];
+
+        let usage = super::scan_codex_lines_for_test(lines);
+
+        assert_eq!(usage.files_scanned, 1);
+        assert_eq!(usage.files_with_usage, 1);
+        assert_eq!(usage.bucket.input_tokens, 1050);
+        assert_eq!(usage.bucket.cached_input_tokens, 350);
+        assert_eq!(usage.bucket.output_tokens, 150);
+        assert_eq!(usage.bucket.total_tokens, 1200);
+        assert_eq!(usage.daily[0].bucket.total_tokens, 1200);
+        assert_eq!(usage.models[0].bucket.total_tokens, 1200);
+    }
+
+    #[test]
     fn scan_claude_lines_dedupes_after_timestamp_cutoff() {
         let lines = vec![
             r#"{"type":"assistant","timestamp":"2026-04-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{"input_tokens":100,"output_tokens":50}}}"#.to_string(),
@@ -500,8 +556,23 @@ mod tests {
         assert_eq!(parsed.bucket.input_tokens, 100);
         assert_eq!(parsed.bucket.cached_input_tokens, 25);
         assert_eq!(parsed.bucket.output_tokens, 40);
-        assert_eq!(parsed.bucket.total_tokens, 165);
+        assert_eq!(parsed.bucket.total_tokens, 140);
         assert_eq!(parsed.model.as_deref(), Some("gpt-5.3-codex"));
+        assert_eq!(parsed.source_kind, super::codex::UsageSourceKind::Delta);
+    }
+
+    #[test]
+    fn codex_parser_flat_token_count_does_not_add_cached_input_to_total_fallback() {
+        let line = r#"{"timestamp":"2026-05-01T12:00:00Z","type":"event_msg","payload":{"type":"token_count","input_tokens":100,"cached_input_tokens":40,"output_tokens":20,"model":"gpt-5.3-codex"}}"#;
+        let parsed = super::codex::parse_codex_line(line)
+            .expect("valid json should parse")
+            .expect("usage should parse");
+
+        assert_eq!(parsed.bucket.input_tokens, 100);
+        assert_eq!(parsed.bucket.cached_input_tokens, 40);
+        assert_eq!(parsed.bucket.output_tokens, 20);
+        assert_eq!(parsed.bucket.total_tokens, 120);
+        assert_eq!(parsed.source_kind, super::codex::UsageSourceKind::Delta);
     }
 
     #[test]
@@ -528,6 +599,7 @@ mod tests {
         assert_eq!(parsed.bucket.cached_input_tokens, 5);
         assert_eq!(parsed.bucket.output_tokens, 2);
         assert_eq!(parsed.bucket.total_tokens, 12);
+        assert_eq!(parsed.source_kind, super::codex::UsageSourceKind::Delta);
     }
 
     #[test]
@@ -541,6 +613,10 @@ mod tests {
         assert_eq!(parsed.bucket.cached_input_tokens, 8);
         assert_eq!(parsed.bucket.output_tokens, 4);
         assert_eq!(parsed.bucket.total_tokens, 24);
+        assert_eq!(
+            parsed.source_kind,
+            super::codex::UsageSourceKind::Cumulative
+        );
     }
 
     #[test]

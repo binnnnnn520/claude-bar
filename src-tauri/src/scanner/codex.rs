@@ -3,11 +3,18 @@ use super::types::TokenBucket;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UsageSourceKind {
+    Delta,
+    Cumulative,
+}
+
 #[derive(Debug, Clone)]
 pub struct ParsedUsage {
     pub timestamp: Option<DateTime<Utc>>,
     pub model: Option<String>,
     pub bucket: TokenBucket,
+    pub source_kind: UsageSourceKind,
 }
 
 pub fn parse_codex_line(line: &str) -> Result<Option<ParsedUsage>, serde_json::Error> {
@@ -31,17 +38,28 @@ pub fn parse_codex_line(line: &str) -> Result<Option<ParsedUsage>, serde_json::E
         return Ok(None);
     }
 
-    let usage = usage_source(payload);
+    let (usage, source_kind) = usage_source(payload);
+    let input_tokens = number_at_any(
+        usage,
+        &[
+            "input_tokens",
+            "inputTokens",
+            "prompt_tokens",
+            "promptTokens",
+        ],
+    );
+    let output_tokens = number_at_any(
+        usage,
+        &[
+            "output_tokens",
+            "outputTokens",
+            "completion_tokens",
+            "completionTokens",
+        ],
+    );
+    let total_tokens = number_at_any(usage, &["total_tokens", "totalTokens"]);
     let bucket = TokenBucket {
-        input_tokens: number_at_any(
-            usage,
-            &[
-                "input_tokens",
-                "inputTokens",
-                "prompt_tokens",
-                "promptTokens",
-            ],
-        ),
+        input_tokens,
         cached_input_tokens: number_at_any(
             usage,
             &[
@@ -56,22 +74,12 @@ pub fn parse_codex_line(line: &str) -> Result<Option<ParsedUsage>, serde_json::E
             usage,
             &["cache_creation_input_tokens", "cacheCreationInputTokens"],
         ),
-        output_tokens: number_at_any(
-            usage,
-            &[
-                "output_tokens",
-                "outputTokens",
-                "completion_tokens",
-                "completionTokens",
-            ],
-        ),
-        total_tokens: number_at_any(usage, &["total_tokens", "totalTokens"]),
-    };
-
-    let bucket = if bucket.total_tokens == 0 {
-        bucket.with_total()
-    } else {
-        bucket
+        output_tokens,
+        total_tokens: if total_tokens == 0 {
+            codex_total_tokens(usage, input_tokens, output_tokens)
+        } else {
+            total_tokens
+        },
     };
 
     if bucket.total_tokens == 0 {
@@ -83,6 +91,7 @@ pub fn parse_codex_line(line: &str) -> Result<Option<ParsedUsage>, serde_json::E
         model: string_at_any(payload, &["model", "model_slug", "modelSlug"])
             .or_else(|| string_at_any(usage, &["model", "model_slug", "modelSlug"])),
         bucket,
+        source_kind,
     }))
 }
 
@@ -95,15 +104,46 @@ fn number_at_any(value: &Value, keys: &[&str]) -> u64 {
     0
 }
 
-fn usage_source(payload: &Value) -> &Value {
+fn usage_source(payload: &Value) -> (&Value, UsageSourceKind) {
     let info = payload.get("info");
 
-    // Per-row aggregation should use the increment for this row; total_token_usage
-    // is cumulative and would over-count if summed across token_count events.
-    info.and_then(|info| info.get("last_token_usage"))
-        .or_else(|| info.and_then(|info| info.get("total_token_usage")))
-        .or_else(|| payload.get("usage"))
-        .unwrap_or(payload)
+    if let Some(usage) = info.and_then(|info| info.get("last_token_usage")) {
+        return (usage, UsageSourceKind::Delta);
+    }
+
+    if let Some(usage) = info.and_then(|info| info.get("total_token_usage")) {
+        return (usage, UsageSourceKind::Cumulative);
+    }
+
+    if let Some(usage) = payload.get("usage") {
+        return (usage, UsageSourceKind::Delta);
+    }
+
+    (payload, UsageSourceKind::Delta)
+}
+
+fn codex_total_tokens(usage: &Value, input_tokens: u64, output_tokens: u64) -> u64 {
+    input_tokens + output_tokens + reasoning_output_tokens(usage)
+}
+
+fn reasoning_output_tokens(usage: &Value) -> u64 {
+    let flat = number_at_any(
+        usage,
+        &[
+            "reasoning_output_tokens",
+            "reasoningOutputTokens",
+            "reasoning_tokens",
+            "reasoningTokens",
+        ],
+    );
+
+    let nested = usage
+        .get("output_tokens_details")
+        .or_else(|| usage.get("outputTokensDetails"))
+        .map(|details| number_at_any(details, &["reasoning_tokens", "reasoningTokens"]))
+        .unwrap_or(0);
+
+    flat + nested
 }
 
 fn string_at_any(value: &Value, keys: &[&str]) -> Option<String> {
