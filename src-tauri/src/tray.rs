@@ -3,7 +3,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{App, AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, Size, WebviewWindow, WindowEvent};
+use tauri::{
+    App, AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, Size, WebviewWindow,
+    WindowEvent,
+};
 
 const PANEL_WIDTH: u32 = 420;
 const PANEL_HEIGHT: u32 = 640;
@@ -28,26 +31,31 @@ pub fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
     let quit_id = quit.id().clone();
     let handle = app.handle().clone();
 
-    TrayIconBuilder::new()
+    let mut tray = TrayIconBuilder::new()
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("Token Ledger")
-        .on_menu_event(move |app, event| {
-            if event.id == quit_id {
-                app.exit(0);
-            }
-        })
-        .on_tray_icon_event(move |_tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                toggle_main_window(&handle);
-            }
-        })
-        .build(app)?;
+        .tooltip("Token Ledger");
+
+    if let Some(icon) = app.default_window_icon().cloned() {
+        tray = tray.icon(icon);
+    }
+
+    tray.on_menu_event(move |app, event| {
+        if event.id == quit_id {
+            app.exit(0);
+        }
+    })
+    .on_tray_icon_event(move |_tray, event| {
+        if let TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        } = event
+        {
+            toggle_main_window(&handle);
+        }
+    })
+    .build(app)?;
 
     if let Some(window) = app.get_webview_window("main") {
         let path = saved_position_path(app.handle());
@@ -92,7 +100,10 @@ fn position_panel<R: Runtime>(
     saved: Option<SavedWindowPosition>,
 ) -> tauri::Result<()> {
     let bounds = saved
-        .and_then(|position| monitor_bounds_for_point(window, position.x, position.y).map(|bounds| (position, bounds)))
+        .and_then(|position| {
+            monitor_bounds_for_point(window, position.x, position.y)
+                .map(|bounds| (position, bounds))
+        })
         .map(|(position, bounds)| (Some(position), Some(bounds)))
         .unwrap_or_else(|| (saved, monitor_bounds_for_window(window)));
     let (target_x, target_y) = panel_position(bounds.0, window_width, window_height, bounds.1);
@@ -118,7 +129,11 @@ fn remember_window_position<R: Runtime>(window: &WebviewWindow<R>, path: Option<
     });
 }
 
-fn monitor_bounds_for_point<R: Runtime>(window: &WebviewWindow<R>, x: i32, y: i32) -> Option<MonitorBounds> {
+fn monitor_bounds_for_point<R: Runtime>(
+    window: &WebviewWindow<R>,
+    x: i32,
+    y: i32,
+) -> Option<MonitorBounds> {
     let monitors = window.available_monitors().ok()?;
     let monitor = monitors
         .iter()
@@ -180,7 +195,10 @@ fn panel_position(
         );
     };
 
-    (saved.x.clamp(bounds.x, max_x), saved.y.clamp(bounds.y, max_y))
+    (
+        saved.x.clamp(bounds.x, max_x),
+        saved.y.clamp(bounds.y, max_y),
+    )
 }
 
 fn saved_position_path<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
@@ -205,7 +223,7 @@ fn save_window_position(path: &Path, position: SavedWindowPosition) -> std::io::
 
 #[cfg(test)]
 mod tests {
-    use super::{panel_position, SavedWindowPosition, MonitorBounds};
+    use super::{panel_position, MonitorBounds, SavedWindowPosition};
 
     const PRIMARY: MonitorBounds = MonitorBounds {
         x: 0,
@@ -217,13 +235,19 @@ mod tests {
     #[test]
     fn restores_user_dragged_position_inside_monitor() {
         let saved = SavedWindowPosition { x: 318, y: 142 };
-        assert_eq!(panel_position(Some(saved), 420, 640, Some(PRIMARY)), (318, 142));
+        assert_eq!(
+            panel_position(Some(saved), 420, 640, Some(PRIMARY)),
+            (318, 142)
+        );
     }
 
     #[test]
     fn clamps_saved_position_to_visible_monitor_area() {
         let saved = SavedWindowPosition { x: 1100, y: 900 };
-        assert_eq!(panel_position(Some(saved), 420, 640, Some(PRIMARY)), (860, 320));
+        assert_eq!(
+            panel_position(Some(saved), 420, 640, Some(PRIMARY)),
+            (860, 320)
+        );
     }
 
     #[test]
@@ -240,7 +264,10 @@ mod tests {
             height: 1080,
         };
         let saved = SavedWindowPosition { x: -1500, y: 240 };
-        assert_eq!(panel_position(Some(saved), 420, 640, Some(secondary)), (-1500, 240));
+        assert_eq!(
+            panel_position(Some(saved), 420, 640, Some(secondary)),
+            (-1500, 240)
+        );
     }
 
     #[test]
