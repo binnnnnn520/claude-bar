@@ -64,19 +64,19 @@ button:disabled {
 
 .popover-stage {
   align-items: stretch;
-  justify-content: center;
-  padding: 8px;
+  justify-content: flex-start;
+  padding: 0;
 }
 
 .floating-popover {
-  width: min(420px, calc(100vw - 16px));
-  max-width: 420px;
-  height: calc(100vh - 16px);
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  border-radius: 0 8px 0 0;
   background: rgba(255, 250, 242, 0.98);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -93,8 +93,8 @@ button:disabled {
 }
 
 .popover-head {
-  min-height: 50px;
-  padding: 8px 11px 8px 13px;
+  min-height: 58px;
+  padding: 10px 16px;
 }
 
 .title-group {
@@ -153,7 +153,7 @@ button:disabled {
   display: block;
   color: #34291f;
   font-family: Georgia, "Times New Roman", "Songti SC", serif;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 500;
   line-height: 1.1;
   white-space: nowrap;
@@ -161,7 +161,7 @@ button:disabled {
 
 .app-title span {
   display: block;
-  max-width: 180px;
+  max-width: 260px;
   margin-top: 3px;
   overflow: hidden;
   color: var(--muted);
@@ -173,8 +173,8 @@ button:disabled {
 
 .icon-button,
 .back-button {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -223,9 +223,9 @@ button:disabled {
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: 9px;
+  gap: 12px;
   overflow: hidden;
-  padding: 10px 12px 12px;
+  padding: 14px 16px 16px;
 }
 
 .window-tabs {
@@ -242,7 +242,7 @@ button:disabled {
 
 .window-tabs button {
   min-width: 0;
-  height: 26px;
+  height: 32px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -287,7 +287,7 @@ button:disabled {
   margin-top: 4px;
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 34px;
+  font-size: 44px;
   font-weight: 700;
   line-height: 0.98;
   overflow-wrap: anywhere;
@@ -305,11 +305,11 @@ button:disabled {
 
 .share-wrap {
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
 .share-bar {
-  height: 10px;
+  height: 12px;
   display: flex;
   overflow: hidden;
   border: 1px solid #ddceb9;
@@ -339,7 +339,7 @@ button:disabled {
   justify-content: space-between;
   gap: 6px 10px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .share-legend span,
@@ -383,7 +383,8 @@ button:disabled {
 
 .providers {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .provider-panel,
@@ -396,15 +397,15 @@ button:disabled {
 
 .provider-panel {
   display: grid;
-  gap: 8px;
-  padding: 9px 10px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .provider-line {
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr) auto;
+  grid-template-columns: 86px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .provider-name {
@@ -419,13 +420,13 @@ button:disabled {
 .provider-total {
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .spark-bars {
-  height: 17px;
+  height: 24px;
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(14, minmax(2px, 1fr));
@@ -450,12 +451,12 @@ button:disabled {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
+  gap: 8px;
 }
 
 .metric {
   min-width: 0;
-  padding-top: 6px;
+  padding-top: 8px;
   border-top: 1px solid #dfd1bf;
 }
 
@@ -468,7 +469,7 @@ button:disabled {
   display: block;
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -482,7 +483,7 @@ button:disabled {
 .provider-error {
   min-width: 0;
   color: #8b3f24;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -714,8 +715,9 @@ button:disabled {
 .detail-columns {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 14px;
-  padding-top: 4px;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #dfd1bf;
 }
 
 .detail-columns h2 {
@@ -729,7 +731,7 @@ button:disabled {
 .daily-list {
   min-width: 0;
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .model-row,
@@ -754,7 +756,7 @@ button:disabled {
 }
 
 .daily-row {
-  grid-template-columns: 84px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
 }
 
 .daily-track {
@@ -804,6 +806,7 @@ button:disabled {
 
   .summary-strip,
   .dashboard-grid,
+  .providers,
   .detail-columns {
     grid-template-columns: 1fr;
   }
@@ -811,7 +814,7 @@ button:disabled {
 
 @media (max-width: 430px) {
   .popover-stage {
-    padding: 8px;
+    padding: 0;
   }
 
   .total-copy strong {

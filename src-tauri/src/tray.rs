@@ -2,10 +2,8 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager, PhysicalPosition, Runtime, WebviewWindow};
 
-const WINDOW_WIDTH: i32 = 420;
-const WINDOW_HEIGHT: i32 = 560;
-const WINDOW_X_OFFSET: i32 = 28;
-const WINDOW_Y_OFFSET: i32 = 18;
+const WINDOW_WIDTH: i32 = 820;
+const WINDOW_HEIGHT: i32 = 720;
 
 #[derive(Clone, Copy)]
 struct MonitorBounds {
@@ -99,21 +97,15 @@ fn popover_position(
 ) -> (i32, i32) {
     let Some(bounds) = bounds else {
         return (
-            (x - window_width + WINDOW_X_OFFSET).max(0),
-            (y - window_height - WINDOW_Y_OFFSET).max(0),
+            (x - window_width).max(0),
+            (y - window_height).max(0),
         );
     };
 
     let max_x = (bounds.x + bounds.width - window_width).max(bounds.x);
     let max_y = (bounds.y + bounds.height - window_height).max(bounds.y);
-    let target_x = (x - window_width + WINDOW_X_OFFSET).clamp(bounds.x, max_x);
-    let opens_above = y >= bounds.y + (bounds.height / 2);
-    let raw_y = if opens_above {
-        y - window_height - WINDOW_Y_OFFSET
-    } else {
-        y + WINDOW_Y_OFFSET
-    };
-    let target_y = raw_y.clamp(bounds.y, max_y);
+    let target_x = bounds.x.clamp(bounds.x, max_x);
+    let target_y = max_y;
 
     (target_x, target_y)
 }
@@ -130,22 +122,28 @@ mod tests {
     };
 
     #[test]
-    fn positions_window_above_and_left_of_tray_click_inside_monitor() {
-        assert_eq!(popover_position(1200, 900, 420, 560, Some(PRIMARY)), (808, 322));
+    fn anchors_window_to_monitor_bottom_left() {
+        assert_eq!(popover_position(1200, 900, 820, 720, Some(PRIMARY)), (0, 240));
     }
 
     #[test]
-    fn clamps_window_position_to_screen_origin() {
-        assert_eq!(popover_position(100, 900, 420, 560, Some(PRIMARY)), (0, 322));
+    fn ignores_floating_tray_popup_click_position() {
+        assert_eq!(popover_position(100, 400, 820, 720, Some(PRIMARY)), (0, 240));
     }
 
     #[test]
-    fn opens_below_when_tray_click_is_in_upper_half() {
-        assert_eq!(popover_position(1000, 80, 420, 560, Some(PRIMARY)), (608, 98));
+    fn anchors_to_left_edge_of_current_monitor() {
+        let secondary = MonitorBounds {
+            x: -1920,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
+        assert_eq!(popover_position(-200, 900, 820, 720, Some(secondary)), (-1920, 360));
     }
 
     #[test]
     fn keeps_legacy_origin_clamp_without_monitor_data() {
-        assert_eq!(popover_position(100, 400, 420, 560, None), (0, 0));
+        assert_eq!(popover_position(100, 400, 820, 720, None), (0, 0));
     }
 }

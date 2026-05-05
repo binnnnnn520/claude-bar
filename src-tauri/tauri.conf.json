@@ -14,15 +14,15 @@
       {
         "label": "main",
         "title": "Token Ledger",
-        "width": 420,
-        "height": 560,
+        "width": 820,
+        "height": 720,
         "resizable": false,
         "fullscreen": false,
         "visible": false,
         "decorations": false,
         "transparent": true,
         "skipTaskbar": true,
-        "alwaysOnTop": false
+        "alwaysOnTop": true
       }
     ],
     "security": {

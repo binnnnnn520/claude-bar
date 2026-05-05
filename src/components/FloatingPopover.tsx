@@ -1,4 +1,4 @@
-import type { DailyUsage, ProviderId, ProviderUsage, TokenBucket, UsageSnapshot } from "../types";
+import type { DailyUsage, ModelUsage, ProviderId, ProviderUsage, TokenBucket, UsageSnapshot } from "../types";
 
 type UsageWindow = UsageSnapshot["window"];
 
@@ -44,6 +44,10 @@ function formatTokens(value: number): string {
     notation: "compact",
     maximumFractionDigits: value >= 1_000_000 ? 2 : 1
   }).format(value);
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en").format(value);
 }
 
 function formatScanTime(value: string): string {
@@ -149,6 +153,50 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ModelRows({ models }: { models: ModelUsage[] }) {
+  const visible = models.slice(0, 5);
+  if (visible.length === 0) {
+    return <div className="empty-row">No model rows</div>;
+  }
+
+  return (
+    <div className="model-list">
+      {visible.map((model) => (
+        <div className="model-row" key={model.model}>
+          <span title={model.model}>{model.model}</span>
+          <strong>{formatTokens(model.totalTokens)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DailyRows({ days }: { days: DailyUsage[] }) {
+  const visible = days.slice(-7).reverse();
+  const max = Math.max(0, ...visible.map((day) => day.totalTokens));
+
+  if (visible.length === 0) {
+    return <div className="empty-row">No daily rows</div>;
+  }
+
+  return (
+    <div className="daily-list">
+      {visible.map((day) => {
+        const width = max > 0 ? Math.max(4, Math.round((day.totalTokens / max) * 100)) : 0;
+        return (
+          <div className="daily-row" key={day.date}>
+            <span>{day.date.slice(5)}</span>
+            <div className="daily-track" aria-hidden="true">
+              <i style={{ width: `${width}%` }} />
+            </div>
+            <strong>{formatTokens(day.totalTokens)}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProviderSection({ item, id }: { item?: ProviderUsage; id: ProviderId }) {
   const warnings = item?.parseWarnings ?? 0;
   const firstError = item?.errors[0];
@@ -172,7 +220,9 @@ function ProviderSection({ item, id }: { item?: ProviderUsage; id: ProviderId })
       </div>
 
       <div className="provider-meta">
-        <span>Files {item?.filesWithUsage ?? 0}/{item?.filesScanned ?? 0}</span>
+        <span>
+          Files {formatNumber(item?.filesWithUsage ?? 0)}/{formatNumber(item?.filesScanned ?? 0)}
+        </span>
         {warnings > 0 ? <span className="warn">Warnings {warnings}</span> : null}
       </div>
 
@@ -181,6 +231,17 @@ function ProviderSection({ item, id }: { item?: ProviderUsage; id: ProviderId })
           Error: {firstError}
         </div>
       ) : null}
+
+      <div className="detail-columns">
+        <div>
+          <h2>Models</h2>
+          <ModelRows models={item?.models ?? []} />
+        </div>
+        <div>
+          <h2>Daily</h2>
+          <DailyRows days={item?.daily ?? []} />
+        </div>
+      </div>
     </section>
   );
 }
