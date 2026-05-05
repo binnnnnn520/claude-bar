@@ -5,8 +5,8 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{App, AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, Size, WebviewWindow, WindowEvent};
 
-const PANEL_WIDTH: u32 = 820;
-const PANEL_HEIGHT: u32 = 680;
+const PANEL_WIDTH: u32 = 420;
+const PANEL_HEIGHT: u32 = 640;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct SavedWindowPosition {
@@ -217,18 +217,18 @@ mod tests {
     #[test]
     fn restores_user_dragged_position_inside_monitor() {
         let saved = SavedWindowPosition { x: 318, y: 142 };
-        assert_eq!(panel_position(Some(saved), 760, 640, Some(PRIMARY)), (318, 142));
+        assert_eq!(panel_position(Some(saved), 420, 640, Some(PRIMARY)), (318, 142));
     }
 
     #[test]
     fn clamps_saved_position_to_visible_monitor_area() {
         let saved = SavedWindowPosition { x: 1100, y: 900 };
-        assert_eq!(panel_position(Some(saved), 760, 640, Some(PRIMARY)), (520, 320));
+        assert_eq!(panel_position(Some(saved), 420, 640, Some(PRIMARY)), (860, 320));
     }
 
     #[test]
     fn centers_when_no_saved_position_exists() {
-        assert_eq!(panel_position(None, 760, 640, Some(PRIMARY)), (260, 160));
+        assert_eq!(panel_position(None, 420, 640, Some(PRIMARY)), (430, 160));
     }
 
     #[test]
@@ -240,7 +240,7 @@ mod tests {
             height: 1080,
         };
         let saved = SavedWindowPosition { x: -1500, y: 240 };
-        assert_eq!(panel_position(Some(saved), 760, 640, Some(secondary)), (-1500, 240));
+        assert_eq!(panel_position(Some(saved), 420, 640, Some(secondary)), (-1500, 240));
     }
 
     #[test]

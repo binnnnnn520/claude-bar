@@ -1,5 +1,6 @@
 use crate::scanner;
 use crate::scanner::types::UsageSnapshot;
+use tauri::AppHandle;
 
 #[tauri::command]
 pub async fn scan_usage(window: String) -> Result<UsageSnapshot, String> {
@@ -8,6 +9,11 @@ pub async fn scan_usage(window: String) -> Result<UsageSnapshot, String> {
     tauri::async_runtime::spawn_blocking(move || scanner::scan_usage(&normalized))
         .await
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
 }
 
 fn normalize_usage_window(window: &str) -> Result<String, String> {

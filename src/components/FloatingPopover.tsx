@@ -1,4 +1,7 @@
 import type { DailyUsage, ModelUsage, ProviderId, ProviderUsage, TokenBucket, UsageSnapshot } from "../types";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
+import type { PointerEvent } from "react";
 
 type UsageWindow = UsageSnapshot["window"];
 
@@ -98,6 +101,20 @@ function WindowSelector({
       ))}
     </div>
   );
+}
+
+function startWindowDrag(event: PointerEvent<HTMLElement>) {
+  if (event.button !== 0) {
+    return;
+  }
+  if ((event.target as HTMLElement).closest("button")) {
+    return;
+  }
+  void getCurrentWindow().startDragging().catch(() => undefined);
+}
+
+function quitApp() {
+  void invoke("quit_app");
 }
 
 function ShareBar({ snapshot }: { snapshot: UsageSnapshot }) {
@@ -257,26 +274,31 @@ export function FloatingPopover({
   return (
     <main className="popover-stage">
       <section className="floating-popover" aria-label="Local token popover" aria-busy={isLoading}>
-        <header className="popover-head" data-tauri-drag-region>
-          <div className="title-group" data-tauri-drag-region>
+        <header className="popover-head" onPointerDown={startWindowDrag}>
+          <div className="title-group">
             <div className="ledger-glyph" aria-hidden="true">
               <span />
             </div>
-            <div className="app-title" data-tauri-drag-region>
+            <div className="app-title">
               <strong>Token Ledger</strong>
               <span>{isLoading ? "Scanning" : `Scanned ${formatScanTime(snapshot.scannedAt)}`}</span>
             </div>
           </div>
-          <button
-            className="icon-button"
-            title="Refresh usage"
-            aria-label="Refresh usage"
-            type="button"
-            onClick={onRefresh}
-            disabled={isLoading}
-          >
-            <span className={`refresh-icon ${isLoading ? "spinning" : ""}`} aria-hidden="true" />
-          </button>
+          <div className="header-actions">
+            <button
+              className="icon-button"
+              title="Refresh usage"
+              aria-label="Refresh usage"
+              type="button"
+              onClick={onRefresh}
+              disabled={isLoading}
+            >
+              <span className={`refresh-icon ${isLoading ? "spinning" : ""}`} aria-hidden="true" />
+            </button>
+            <button className="close-button" title="Exit Token Ledger" aria-label="Exit Token Ledger" type="button" onClick={quitApp}>
+              ×
+            </button>
+          </div>
         </header>
 
         <div className="popover-body">
