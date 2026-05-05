@@ -7,7 +7,6 @@ interface FloatingPopoverProps {
   selectedWindow: UsageWindow;
   onWindowChange: (window: UsageWindow) => void;
   onRefresh: () => void;
-  onOpenDashboard: () => void;
   isLoading: boolean;
   error: string | null;
 }
@@ -191,7 +190,6 @@ export function FloatingPopover({
   selectedWindow,
   onWindowChange,
   onRefresh,
-  onOpenDashboard,
   isLoading,
   error
 }: FloatingPopoverProps) {
@@ -243,14 +241,6 @@ export function FloatingPopover({
             ))}
           </div>
         </div>
-
-        <footer className="popover-footer">
-          <button className="primary-button" type="button" onClick={onOpenDashboard} title="Open dashboard">
-            Dashboard
-            <span className="arrow-icon" aria-hidden="true" />
-          </button>
-          <span className="footer-status">{snapshot.providers.length} providers</span>
-        </footer>
       </section>
     </main>
   );

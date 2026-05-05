@@ -28,12 +28,15 @@ html,
 body,
 #root {
   width: 100%;
+  height: 100%;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
+  overflow: hidden;
   background:
     linear-gradient(90deg, rgba(91, 70, 51, 0.045) 1px, transparent 1px) 0 0 / 42px 42px,
     linear-gradient(0deg, rgba(91, 70, 51, 0.04) 1px, transparent 1px) 0 0 / 42px 42px,
@@ -52,20 +55,26 @@ button:disabled {
 
 .popover-stage,
 .dashboard-stage {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: flex;
+  overflow: hidden;
   color: var(--ink);
 }
 
 .popover-stage {
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
-  padding: 12px 8px;
+  padding: 8px;
 }
 
 .floating-popover {
-  width: min(386px, calc(100vw - 16px));
-  max-width: 386px;
+  width: min(420px, calc(100vw - 16px));
+  max-width: 420px;
+  height: calc(100vh - 16px);
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: rgba(255, 250, 242, 0.98);
@@ -84,8 +93,8 @@ button:disabled {
 }
 
 .popover-head {
-  min-height: 56px;
-  padding: 10px 12px 10px 14px;
+  min-height: 50px;
+  padding: 8px 11px 8px 13px;
 }
 
 .title-group {
@@ -96,8 +105,8 @@ button:disabled {
 }
 
 .ledger-glyph {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -144,7 +153,7 @@ button:disabled {
   display: block;
   color: #34291f;
   font-family: Georgia, "Times New Roman", "Songti SC", serif;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 500;
   line-height: 1.1;
   white-space: nowrap;
@@ -164,8 +173,8 @@ button:disabled {
 
 .icon-button,
 .back-button {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -211,9 +220,12 @@ button:disabled {
 }
 
 .popover-body {
+  min-height: 0;
   display: grid;
-  gap: 14px;
-  padding: 14px;
+  align-content: start;
+  gap: 9px;
+  overflow: hidden;
+  padding: 10px 12px 12px;
 }
 
 .window-tabs {
@@ -230,7 +242,7 @@ button:disabled {
 
 .window-tabs button {
   min-width: 0;
-  height: 28px;
+  height: 26px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -275,7 +287,7 @@ button:disabled {
   margin-top: 4px;
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 40px;
+  font-size: 34px;
   font-weight: 700;
   line-height: 0.98;
   overflow-wrap: anywhere;
@@ -293,11 +305,11 @@ button:disabled {
 
 .share-wrap {
   display: grid;
-  gap: 7px;
+  gap: 5px;
 }
 
 .share-bar {
-  height: 12px;
+  height: 10px;
   display: flex;
   overflow: hidden;
   border: 1px solid #ddceb9;
@@ -327,7 +339,7 @@ button:disabled {
   justify-content: space-between;
   gap: 6px 10px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .share-legend span,
@@ -371,7 +383,7 @@ button:disabled {
 
 .providers {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .provider-panel,
@@ -384,15 +396,15 @@ button:disabled {
 
 .provider-panel {
   display: grid;
-  gap: 10px;
-  padding: 11px;
+  gap: 8px;
+  padding: 9px 10px;
 }
 
 .provider-line {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) auto;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .provider-name {
@@ -413,7 +425,7 @@ button:disabled {
 }
 
 .spark-bars {
-  height: 20px;
+  height: 17px;
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(14, minmax(2px, 1fr));
@@ -438,12 +450,12 @@ button:disabled {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
 }
 
 .metric {
   min-width: 0;
-  padding-top: 8px;
+  padding-top: 6px;
   border-top: 1px solid #dfd1bf;
 }
 
@@ -456,7 +468,7 @@ button:disabled {
   display: block;
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -470,7 +482,7 @@ button:disabled {
 .provider-error {
   min-width: 0;
   color: #8b3f24;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -803,16 +815,15 @@ button:disabled {
   }
 
   .total-copy strong {
-    font-size: 36px;
+    font-size: 32px;
   }
 
-  .metric-grid,
   .token-rows {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .provider-line {
-    grid-template-columns: 76px minmax(0, 1fr) auto;
+    grid-template-columns: 78px minmax(0, 1fr) auto;
     gap: 8px;
   }
 }

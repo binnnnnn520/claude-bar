@@ -1,11 +1,19 @@
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{App, AppHandle, Manager, PhysicalPosition, Runtime};
+use tauri::{App, AppHandle, Manager, PhysicalPosition, Runtime, WebviewWindow};
 
-const WINDOW_WIDTH: i32 = 386;
-const WINDOW_HEIGHT: i32 = 520;
+const WINDOW_WIDTH: i32 = 420;
+const WINDOW_HEIGHT: i32 = 560;
 const WINDOW_X_OFFSET: i32 = 28;
 const WINDOW_Y_OFFSET: i32 = 18;
+
+#[derive(Clone, Copy)]
+struct MonitorBounds {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
 
 pub fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -48,31 +56,96 @@ fn toggle_main_window<R: Runtime>(app: &AppHandle<R>, x: i32, y: i32) {
         return;
     }
 
-    let (target_x, target_y) = popover_position(x, y);
+    let size = window.outer_size().ok();
+    let window_width = size.map_or(WINDOW_WIDTH, |item| item.width as i32);
+    let window_height = size.map_or(WINDOW_HEIGHT, |item| item.height as i32);
+    let bounds = monitor_bounds_for_point(&window, x, y);
+    let (target_x, target_y) = popover_position(x, y, window_width, window_height, bounds);
 
     let _ = window.set_position(PhysicalPosition::new(target_x, target_y));
     let _ = window.show();
     let _ = window.set_focus();
 }
 
-fn popover_position(x: i32, y: i32) -> (i32, i32) {
-    (
-        (x - WINDOW_WIDTH + WINDOW_X_OFFSET).max(0),
-        (y - WINDOW_HEIGHT - WINDOW_Y_OFFSET).max(0),
-    )
+fn monitor_bounds_for_point<R: Runtime>(window: &WebviewWindow<R>, x: i32, y: i32) -> Option<MonitorBounds> {
+    let monitors = window.available_monitors().ok()?;
+    let monitor = monitors
+        .iter()
+        .find(|item| {
+            let position = item.position();
+            let size = item.size();
+            let right = position.x + size.width as i32;
+            let bottom = position.y + size.height as i32;
+            x >= position.x && x <= right && y >= position.y && y <= bottom
+        })
+        .or_else(|| monitors.first())?;
+    let position = monitor.position();
+    let size = monitor.size();
+
+    Some(MonitorBounds {
+        x: position.x,
+        y: position.y,
+        width: size.width as i32,
+        height: size.height as i32,
+    })
+}
+
+fn popover_position(
+    x: i32,
+    y: i32,
+    window_width: i32,
+    window_height: i32,
+    bounds: Option<MonitorBounds>,
+) -> (i32, i32) {
+    let Some(bounds) = bounds else {
+        return (
+            (x - window_width + WINDOW_X_OFFSET).max(0),
+            (y - window_height - WINDOW_Y_OFFSET).max(0),
+        );
+    };
+
+    let max_x = (bounds.x + bounds.width - window_width).max(bounds.x);
+    let max_y = (bounds.y + bounds.height - window_height).max(bounds.y);
+    let target_x = (x - window_width + WINDOW_X_OFFSET).clamp(bounds.x, max_x);
+    let opens_above = y >= bounds.y + (bounds.height / 2);
+    let raw_y = if opens_above {
+        y - window_height - WINDOW_Y_OFFSET
+    } else {
+        y + WINDOW_Y_OFFSET
+    };
+    let target_y = raw_y.clamp(bounds.y, max_y);
+
+    (target_x, target_y)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::popover_position;
+    use super::{popover_position, MonitorBounds};
+
+    const PRIMARY: MonitorBounds = MonitorBounds {
+        x: 0,
+        y: 0,
+        width: 1280,
+        height: 960,
+    };
 
     #[test]
-    fn positions_window_above_and_left_of_tray_click() {
-        assert_eq!(popover_position(1200, 900), (842, 362));
+    fn positions_window_above_and_left_of_tray_click_inside_monitor() {
+        assert_eq!(popover_position(1200, 900, 420, 560, Some(PRIMARY)), (808, 322));
     }
 
     #[test]
     fn clamps_window_position_to_screen_origin() {
-        assert_eq!(popover_position(100, 400), (0, 0));
+        assert_eq!(popover_position(100, 900, 420, 560, Some(PRIMARY)), (0, 322));
+    }
+
+    #[test]
+    fn opens_below_when_tray_click_is_in_upper_half() {
+        assert_eq!(popover_position(1000, 80, 420, 560, Some(PRIMARY)), (608, 98));
+    }
+
+    #[test]
+    fn keeps_legacy_origin_clamp_without_monitor_data() {
+        assert_eq!(popover_position(100, 400, 420, 560, None), (0, 0));
     }
 }

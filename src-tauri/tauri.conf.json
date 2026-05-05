@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "Token Ledger",
-        "width": 386,
-        "height": 520,
+        "width": 420,
+        "height": 560,
         "resizable": false,
         "fullscreen": false,
         "visible": false,
