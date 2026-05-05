@@ -1,6 +1,6 @@
 # Claude Bar
 
-Claude Bar 是一个 Windows 托盘应用，用来统计本机 Codex 和 Claude 的 token 使用情况。它不会登录账号，也不会请求远程额度接口，而是直接扫描你电脑上的本地 JSONL 日志，把最近一段时间的用量汇总成一个轻量的悬浮面板。
+Claude Bar 是一个 轻量化仅有1.5MB的Windows 托盘应用，用来统计本机 Codex 和 Claude 的 token 使用情况。它不会登录账号，也不会请求远程额度接口，而是直接扫描你电脑上的本地 JSONL 日志，把最近一段时间的用量汇总成一个轻量的悬浮面板。
 
 安装包内的应用名是 **Token Ledger**。
 
