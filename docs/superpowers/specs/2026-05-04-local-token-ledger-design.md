@@ -243,14 +243,21 @@ UI tests:
 - Refresh button triggers scanner command.
 - No login, cookie, or network controls appear in the MVP UI.
 
-Manual checks:
+Current MVP manual checks:
 
 - Open popover from tray.
+- Click tray icon again to hide the popover.
+- Refresh action runs a local rescan.
+- Window selector switches between last 30 days, current month, and today.
+- Dashboard button opens the in-window dashboard view, and Back returns to the popover.
+- Popover remains readable at 100%, 125%, and 150% Windows scaling.
+
+Future manual checks:
+
 - Close on blur.
 - Close on Esc.
 - Pin keeps the popover visible.
-- Dashboard button opens larger window.
-- Popover remains readable at 100%, 125%, and 150% Windows scaling.
+- Dashboard button opens a larger separate dashboard window.
 
 ## Implementation Status
 

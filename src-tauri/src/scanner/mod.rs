@@ -124,7 +124,8 @@ where
 {
     let mut found_usage = false;
     let mut saw_delta_usage = false;
-    let mut cumulative_candidate: Option<CodexUsageRow> = None;
+    let mut cumulative_before_cutoff: Option<CodexUsageRow> = None;
+    let mut cumulative_after_cutoff: Option<CodexUsageRow> = None;
 
     for line in lines {
         let parsed = match codex::parse_codex_line(&line) {
@@ -145,7 +146,7 @@ where
 
         let fallback_date = fallback_date.clone();
 
-        if let Some(cutoff) = cutoff.as_ref() {
+        let before_cutoff = if let Some(cutoff) = cutoff.as_ref() {
             let timestamp_before_cutoff = timestamp
                 .as_ref()
                 .is_some_and(|timestamp| timestamp < cutoff);
@@ -154,10 +155,10 @@ where
                     .as_deref()
                     .is_some_and(|date| fallback_date_before_cutoff(date, cutoff));
 
-            if timestamp_before_cutoff || fallback_before_cutoff {
-                continue;
-            }
-        }
+            timestamp_before_cutoff || fallback_before_cutoff
+        } else {
+            false
+        };
 
         let date = timestamp
             .map(date_key)
@@ -172,20 +173,30 @@ where
 
         match source_kind {
             codex::UsageSourceKind::Delta => {
+                if before_cutoff {
+                    continue;
+                }
+
                 add_codex_usage_row(usage, row);
                 saw_delta_usage = true;
                 found_usage = true;
             }
             codex::UsageSourceKind::Cumulative => {
-                if !saw_delta_usage {
-                    cumulative_candidate = Some(row);
+                if before_cutoff {
+                    cumulative_before_cutoff = Some(row);
+                } else {
+                    cumulative_after_cutoff = Some(row);
                 }
             }
         }
     }
 
     if !saw_delta_usage {
-        if let Some(row) = cumulative_candidate {
+        if let Some(mut row) = cumulative_after_cutoff {
+            if let Some(before_row) = cumulative_before_cutoff {
+                row.bucket = row.bucket.saturating_sub(&before_row.bucket);
+            }
+
             add_codex_usage_row(usage, row);
             found_usage = true;
         }
@@ -367,6 +378,35 @@ mod tests {
     }
 
     #[test]
+    fn token_bucket_saturating_subtracts_each_field() {
+        let after = TokenBucket {
+            input_tokens: 10,
+            cached_input_tokens: 20,
+            cache_read_tokens: 30,
+            cache_creation_tokens: 40,
+            output_tokens: 50,
+            total_tokens: 60,
+        };
+        let before = TokenBucket {
+            input_tokens: 3,
+            cached_input_tokens: 21,
+            cache_read_tokens: 10,
+            cache_creation_tokens: 41,
+            output_tokens: 5,
+            total_tokens: 100,
+        };
+
+        let bucket = after.saturating_sub(&before);
+
+        assert_eq!(bucket.input_tokens, 7);
+        assert_eq!(bucket.cached_input_tokens, 0);
+        assert_eq!(bucket.cache_read_tokens, 20);
+        assert_eq!(bucket.cache_creation_tokens, 0);
+        assert_eq!(bucket.output_tokens, 45);
+        assert_eq!(bucket.total_tokens, 0);
+    }
+
+    #[test]
     fn scan_lines_aggregates_provider_usage() {
         let lines = vec![
             r#"{"type":"assistant","timestamp":"2026-05-01T12:00:00Z","message":{"id":"msg_1","model":"claude-sonnet","usage":{"input_tokens":10,"output_tokens":5}}}"#.to_string(),
@@ -439,6 +479,31 @@ mod tests {
         assert_eq!(usage.bucket.total_tokens, 1200);
         assert_eq!(usage.daily[0].bucket.total_tokens, 1200);
         assert_eq!(usage.models[0].bucket.total_tokens, 1200);
+    }
+
+    #[test]
+    fn scan_codex_lines_subtracts_cumulative_baseline_before_cutoff() {
+        let lines = vec![
+            r#"{"timestamp":"2026-04-01T12:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":900,"cached_input_tokens":300,"output_tokens":100,"total_tokens":1000}},"model":"before-model"}}"#.to_string(),
+            r#"{"timestamp":"2026-05-01T12:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1050,"cached_input_tokens":350,"output_tokens":150,"total_tokens":1200}},"model":"after-model"}}"#.to_string(),
+        ];
+
+        let usage = super::scan_codex_lines_for_test_with_cutoff_and_fallback_date(
+            lines,
+            utc_timestamp("2026-04-15T00:00:00Z"),
+            None,
+        );
+
+        assert_eq!(usage.files_scanned, 1);
+        assert_eq!(usage.files_with_usage, 1);
+        assert_eq!(usage.bucket.input_tokens, 150);
+        assert_eq!(usage.bucket.cached_input_tokens, 50);
+        assert_eq!(usage.bucket.output_tokens, 50);
+        assert_eq!(usage.bucket.total_tokens, 200);
+        assert_eq!(usage.daily[0].date, "2026-05-01");
+        assert_eq!(usage.daily[0].bucket.total_tokens, 200);
+        assert_eq!(usage.models[0].model, "after-model");
+        assert_eq!(usage.models[0].bucket.total_tokens, 200);
     }
 
     #[test]

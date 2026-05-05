@@ -37,6 +37,21 @@ impl TokenBucket {
         self.output_tokens += other.output_tokens;
         self.total_tokens += other.total_tokens;
     }
+
+    pub fn saturating_sub(&self, other: &TokenBucket) -> Self {
+        Self {
+            input_tokens: self.input_tokens.saturating_sub(other.input_tokens),
+            cached_input_tokens: self
+                .cached_input_tokens
+                .saturating_sub(other.cached_input_tokens),
+            cache_read_tokens: self.cache_read_tokens.saturating_sub(other.cache_read_tokens),
+            cache_creation_tokens: self
+                .cache_creation_tokens
+                .saturating_sub(other.cache_creation_tokens),
+            output_tokens: self.output_tokens.saturating_sub(other.output_tokens),
+            total_tokens: self.total_tokens.saturating_sub(other.total_tokens),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
