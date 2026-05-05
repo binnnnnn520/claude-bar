@@ -1,5 +1,6 @@
 use crate::scanner;
 use crate::scanner::types::UsageSnapshot;
+use crate::tray::{self, PanelMode};
 
 #[tauri::command]
 pub async fn scan_usage(window: String) -> Result<UsageSnapshot, String> {
@@ -8,6 +9,12 @@ pub async fn scan_usage(window: String) -> Result<UsageSnapshot, String> {
     tauri::async_runtime::spawn_blocking(move || scanner::scan_usage(&normalized))
         .await
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn set_window_mode(window: tauri::WebviewWindow, mode: String) -> Result<(), String> {
+    let mode = PanelMode::parse(&mode)?;
+    tray::set_panel_mode(&window, mode).map_err(|error| error.to_string())
 }
 
 fn normalize_usage_window(window: &str) -> Result<String, String> {
@@ -20,6 +27,7 @@ fn normalize_usage_window(window: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::normalize_usage_window;
+    use crate::tray::PanelMode;
 
     #[test]
     fn normalize_usage_window_accepts_supported_windows() {
@@ -33,6 +41,20 @@ mod tests {
         assert_eq!(
             normalize_usage_window("week"),
             Err("Unsupported usage window: week".to_string())
+        );
+    }
+
+    #[test]
+    fn panel_mode_parse_accepts_supported_modes() {
+        assert_eq!(PanelMode::parse("compact"), Ok(PanelMode::Compact));
+        assert_eq!(PanelMode::parse("dashboard"), Ok(PanelMode::Dashboard));
+    }
+
+    #[test]
+    fn panel_mode_parse_rejects_unsupported_modes() {
+        assert_eq!(
+            PanelMode::parse("full"),
+            Err("Unsupported panel mode: full".to_string())
         );
     }
 }

@@ -74,7 +74,7 @@ button:disabled {
   height: 100vh;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   border: 1px solid var(--line-strong);
   border-radius: 0 8px 0 0;
   background: rgba(255, 250, 242, 0.98);
@@ -93,8 +93,8 @@ button:disabled {
 }
 
 .popover-head {
-  min-height: 58px;
-  padding: 10px 16px;
+  min-height: 44px;
+  padding: 7px 10px;
 }
 
 .title-group {
@@ -105,8 +105,8 @@ button:disabled {
 }
 
 .ledger-glyph {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -153,7 +153,7 @@ button:disabled {
   display: block;
   color: #34291f;
   font-family: Georgia, "Times New Roman", "Songti SC", serif;
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 500;
   line-height: 1.1;
   white-space: nowrap;
@@ -161,7 +161,7 @@ button:disabled {
 
 .app-title span {
   display: block;
-  max-width: 260px;
+  max-width: 210px;
   margin-top: 3px;
   overflow: hidden;
   color: var(--muted);
@@ -173,8 +173,8 @@ button:disabled {
 
 .icon-button,
 .back-button {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -223,9 +223,9 @@ button:disabled {
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 6px;
   overflow: hidden;
-  padding: 14px 16px 16px;
+  padding: 8px 10px 6px;
 }
 
 .window-tabs {
@@ -242,7 +242,7 @@ button:disabled {
 
 .window-tabs button {
   min-width: 0;
-  height: 32px;
+  height: 24px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -266,7 +266,7 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 14px;
+  gap: 10px;
 }
 
 .total-copy {
@@ -287,14 +287,14 @@ button:disabled {
   margin-top: 4px;
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 44px;
+  font-size: 27px;
   font-weight: 700;
   line-height: 0.98;
   overflow-wrap: anywhere;
 }
 
 .local-badge {
-  padding: 6px 9px;
+  padding: 5px 8px;
   border: 1px solid rgba(197, 111, 63, 0.32);
   border-radius: 999px;
   background: rgba(197, 111, 63, 0.1);
@@ -305,11 +305,11 @@ button:disabled {
 
 .share-wrap {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .share-bar {
-  height: 12px;
+  height: 8px;
   display: flex;
   overflow: hidden;
   border: 1px solid #ddceb9;
@@ -383,8 +383,8 @@ button:disabled {
 
 .providers {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 5px;
 }
 
 .provider-panel,
@@ -397,15 +397,15 @@ button:disabled {
 
 .provider-panel {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 4px;
+  padding: 6px 8px;
 }
 
 .provider-line {
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr) auto;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
 }
 
 .provider-name {
@@ -420,13 +420,13 @@ button:disabled {
 .provider-total {
   color: #382a20;
   font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .spark-bars {
-  height: 24px;
+  height: 12px;
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(14, minmax(2px, 1fr));
@@ -449,7 +449,7 @@ button:disabled {
 }
 
 .metric-grid {
-  display: grid;
+  display: none;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
@@ -496,14 +496,14 @@ button:disabled {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 6px 10px 8px;
   border-top: 1px solid var(--line);
   background: rgba(248, 240, 228, 0.78);
 }
 
 .primary-button,
 .secondary-button {
-  height: 31px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -596,15 +596,16 @@ button:disabled {
 .dashboard-stage {
   align-items: stretch;
   justify-content: center;
-  padding: 18px;
+  padding: 0;
 }
 
 .dashboard-shell {
-  width: min(1040px, 100%);
+  width: 100%;
+  height: 100%;
   min-width: 0;
   align-self: flex-start;
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  border-radius: 8px 0 0 0;
   background: rgba(255, 250, 242, 0.97);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -634,6 +635,7 @@ button:disabled {
   display: grid;
   gap: 14px;
   padding: 16px;
+  overflow: hidden;
 }
 
 .summary-strip {
