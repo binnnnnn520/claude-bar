@@ -1,6 +1,6 @@
 [package]
 name = "claude-bar"
-version = "0.1.2"
+version = "0.1.3"
 description = "Local Codex and Claude token ledger"
 authors = ["binnnnnn520"]
 edition = "2021"

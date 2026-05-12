@@ -38,9 +38,9 @@ Claude Bar 是一个 轻量化仅有1.5MB的Windows 托盘应用，用来统计�
 
 下载并运行 Windows 安装包：
 
-- [Token Ledger 0.1.2 x64 setup](installers/Token%20Ledger_0.1.2_x64-setup.exe)
-- Size: 1.06 MiB
-- SHA256: `5DC27665E8EAA482E05D9037F60E2F8E2477C7FDA2121EAB264724D00C86DE37`
+- [Token Ledger 0.1.3 x64 setup](installers/Token%20Ledger_0.1.3_x64-setup.exe)
+- Size: 1.08 MiB
+- SHA256: `403F481F0658474F4D17B2E567AF97E2BF1A50A0C061FCF1E0C617E084CB2AB2`
 
 ## 本地数据源
 
